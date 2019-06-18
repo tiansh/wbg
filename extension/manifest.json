@@ -1,0 +1,105 @@
+{
+
+  "manifest_version": 2,
+  "name": "__MSG_extensionName__",
+  "description": "__MSG_extensionDescription__",
+  "version": "0.0.1",
+  "default_locale": "zh_CN",
+
+  "icons": {
+    "96": "wbg.svg"
+  },
+
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "storage",
+    "unlimitedStorage",
+    "menus",
+    "downloads",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "scripts": [
+      "yaofang/common/browser/browser.js",
+      "yaofang/common/util/functools.js",
+
+      "yaofang/background/message/message.js",
+
+      "yaofang/background/controller/contextmenu/contextmenu.js",
+      "background/controller/download/download.js"
+    ]
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.weibo.com/*"
+      ],
+      "exclude_matches": [
+        "*://weibo.com/nguide/*",
+        "*://weibo.com/a/bind/*",
+        "https://api.weibo.com/chat*"
+      ],
+      "js": [
+        "yaofang/common/browser/browser.js",
+        "yaofang/common/util/functools.js",
+        "yaofang/common/util/urls.js",
+        "yaofang/content/util/priority.js",
+        "yaofang/content/util/debug.js",
+        "yaofang/content/util/i18n.js",
+        "yaofang/content/util/strings.js",
+        "yaofang/content/util/css.js",
+        "yaofang/content/util/inject.js",
+        "yaofang/content/util/keyboard.js",
+        "yaofang/content/util/ui.js",
+        "yaofang/content/util/dom.js",
+        "content/util/mid.js",
+
+        "yaofang/common/network/network.js",
+        "yaofang/content/request/longfeed.js",
+        "content/request/feed.js",
+
+        "yaofang/content/storage/storage.js",
+        "yaofang/content/storage/config.js",
+
+        "yaofang/content/init/page.js",
+        "yaofang/content/init/init.js",
+        "yaofang/content/init/setup.js",
+        "yaofang/content/init/ready.js",
+
+        "yaofang/content/backend/message.js",
+        "yaofang/content/backend/contextmenu.js",
+
+        "yaofang/content/ruleset/rule.js",
+        "yaofang/content/ruleset/observer.js",
+        "content/ruleset/feed.js",
+        "yaofang/content/ruleset/dialog.js",
+        "yaofang/content/rule/filter/common/parse.js",
+
+        "content/download/download.js",
+        "content/download/setting.js",
+
+        "yaofang/content/rule/about/about.js",
+        "content/about/export.js",
+        "yaofang/content/rule/about/whatsnew.js",
+        "yaofang/content/rule/about/debug.js",
+        "content/about/script.js",
+
+        "content/main/entry.js",
+
+        "content/i18n/fix.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+
+  "applications": {
+    "gecko": {
+      "id": "{79d762e3-ba9a-4d38-a170-c2c771f32415}",
+      "strict_min_version": "60.0"
+    }
+  }
+
+}
