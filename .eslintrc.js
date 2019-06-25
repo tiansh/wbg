@@ -2,7 +2,7 @@ module.exports = {
   root: true,
   extends: 'eslint:recommended',
   parserOptions: {
-    ecmaVersion: 8,
+    ecmaVersion: 2018,
     ecmaFeatures: {
       impliedStrict: true,
     },
@@ -86,5 +86,7 @@ module.exports = {
     'complexity': ['warn'],
 
     'no-console': ['off'],
+    'no-async-promise-executor': ['off'],
+    'require-atomic-updates': ['off'],
 	}
 }

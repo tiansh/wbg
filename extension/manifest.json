@@ -3,7 +3,7 @@
   "manifest_version": 2,
   "name": "__MSG_extensionName__",
   "description": "__MSG_extensionDescription__",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "default_locale": "zh_CN",
 
   "icons": {
@@ -56,9 +56,12 @@
         "yaofang/content/util/ui.js",
         "yaofang/content/util/dom.js",
         "content/util/mid.js",
+        "content/util/timestamp.js",
+        "content/util/parse.js",
 
         "yaofang/common/network/network.js",
         "yaofang/content/request/longfeed.js",
+        "content/request/list.js",
         "content/request/feed.js",
 
         "yaofang/content/storage/storage.js",
@@ -78,8 +81,12 @@
         "yaofang/content/ruleset/dialog.js",
         "yaofang/content/rule/filter/common/parse.js",
 
-        "content/download/download.js",
-        "content/download/setting.js",
+        "content/batch/handler.js",
+        "content/batch/progress.js",
+
+        "content/feed/download/download.js",
+        "content/feed/download/batch.js",
+        "content/feed/download/setting.js",
 
         "yaofang/content/rule/about/about.js",
         "content/about/export.js",
@@ -89,7 +96,7 @@
 
         "content/main/entry.js",
 
-        "content/i18n/fix.js"
+        "content/util/i18nfix.js"
       ],
       "run_at": "document_start"
     }

@@ -5,7 +5,7 @@
 
   const base62 = util.base62 = {};
 
-  const base62Dict = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const base62Dict = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
   base62.decode = function (str) {
     return [...str].reduce((prev, ch) => {
@@ -14,7 +14,7 @@
   };
 
   base62.encode = function toString(num) {
-    if (num == 0) return '0';
+    if (num === 0) return '0';
     if (num < 62) return base62Dict[num];
     return toString(Math.floor(num / 62)) + base62Dict[num % 62];
   };

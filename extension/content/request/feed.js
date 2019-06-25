@@ -5,6 +5,7 @@
   const request = yawf.request = yawf.request || {};
 
   const dom = util.dom;
+  const parse = util.parse;
 
   // 获取单条微博
   const getFeed = async function (author, mid) {
@@ -12,20 +13,12 @@
     const html = await fetch(requestUrl, { credentials: 'include' }).then(r => r.text());
     const domParser = new DOMParser();
     const page = domParser.parseFromString(html, 'text/html');
-    const scripts = Array.from(page.querySelectorAll('script'));
     let feedModel = null;
-    scripts.find(script => {
-      try {
-        const content = script.textContent.match(/^\s*FM\.view\((\{.*\})\);?\s*$/);
-        if (!content) return false;
-        const model = JSON.parse(content[1]);
-        if (model.ns !== 'pl.content.weiboDetail.index') return false;
-        feedModel = model;
-        return true;
-      } catch (e) {
-        return false;
-      }
-    });
+    for (let model of parse.models(page)) {
+      if (model.ns !== 'pl.content.weiboDetail.index') continue;
+      feedModel = model;
+      break;
+    }
     if (!feedModel) return null;
     const feed = domParser.parseFromString(feedModel.html, 'text/html').querySelector('[mid]');
     const unfoldList = Array.from(feed.querySelectorAll('[action-type="fl_unfold"]'));

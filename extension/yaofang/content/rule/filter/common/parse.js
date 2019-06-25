@@ -424,12 +424,12 @@
 
     /**
      *//**
-     * @param {Node} target
-     * @returns {string}
-     *//**
-     * @param {Selection} target
-     * @returns {string[]}
-     */
+    * @param {Node} target
+    * @returns {string}
+    *//**
+    * @param {Selection} target
+    * @returns {string[]}
+    */
     const parser = function (target) {
       if (target instanceof Node) {
         if (nodeCache.has(target)) return nodeCache.get(target);
@@ -714,8 +714,10 @@
     }
   };
   date.date = (feed, isMain) => {
-    const domList = source.dom(feed, isMain);
-    return domList.map(dom => new Date(dom.getAttribute('date'))).filter(date => +date);
+    const domList = date.dom(feed, isMain);
+    return domList.map(dom => (
+      new Date(Number(dom.getAttribute('date') || dom.getAttribute('yawf-date')))
+    )).filter(date => +date);
   };
 
   // 其他基础通用

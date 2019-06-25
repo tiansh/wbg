@@ -8,16 +8,20 @@
   const feedParser = yawf.feed;
   const downloader = yawf.downloader;
 
+  const wbg = window.wbg;
+  const batch = wbg.batch;
+
   const i18n = util.i18n;
+  const css = util.css;
 
   i18n.downloadTabTitle = {
-    cn: '备份下载',
-    tw: '備份下載',
-    en: 'Download',
+    cn: '微博下载',
+    tw: '微博下載',
+    en: 'Feed Download',
   };
 
-  const download = yawf.rules.download = {};
-  download.download = rule.Tab({
+  const feedDownload = yawf.rules.feedDownload = {};
+  feedDownload.feedDownload = rule.Tab({
     template: () => i18n.downloadTabTitle,
   });
 
@@ -27,9 +31,9 @@
     en: 'Download Content',
   };
 
-  const content = download.content = {};
+  const content = feedDownload.content = {};
   content.content = rule.Group({
-    parent: download.download,
+    parent: feedDownload.feedDownload,
     template: () => i18n.contentGroupTitle,
   });
 
@@ -91,14 +95,14 @@
     template: () => i18n.downloadVideo,
   });
 
-  i18n.singleGroupTitle = {
+  i18n.singleDownloadGroupTitle = {
     cn: '单条下载',
   };
 
-  const single = download.single = {};
+  const single = feedDownload.single = {};
   single.single = rule.Group({
-    parent: download.download,
-    template: () => i18n.singleGroupTitle,
+    parent: feedDownload.feedDownload,
+    template: () => i18n.singleDownloadGroupTitle,
   });
 
   Object.assign(i18n, {
@@ -113,14 +117,6 @@
     },
   });
 
-  const getFeedInfo = function (feed) {
-    const mid = feed.getAttribute('mid');
-    if (!mid) return null;
-    const [author] = feedParser.author.id(feed);
-    if (!author) return null;
-    return [author, mid];
-  };
-
   content.downloadOnFeedMenu = rule.Rule({
     id: 'download_on_feed_menu',
     version: 1,
@@ -129,7 +125,7 @@
     template: () => i18n.downloadOnFeedMenu,
     ainit() {
       observer.feed.add(function (feed) {
-        const [author, mid] = getFeedInfo(feed) || [];
+        const [author, mid] = downloader.FeedDownloader.getFeedInfo(feed) || [];
         if (!author || !mid) return;
         const menu = feed.querySelector('[node-type="fl_menu_right"] ul:not([node-type="hide"])');
         if (!menu) return;
@@ -139,7 +135,7 @@
         a.title = a.textContent = i18n.downloadFeed;
         a.addEventListener('click', event => {
           if (!event.isTrusted) return;
-          const feedDownloader = new downloader.FeedDownloader();
+          const feedDownloader = new downloader.FeedDownloader('./wbg/feed/single/');
           feedDownloader.download(author, mid);
         });
         menu.insertBefore(ul.firstChild, menu.firstChild);
@@ -157,17 +153,99 @@
       contextmenu.addListener(function (/** @type {MouseEvent} */event) {
         const feed = event.target.closest('[mid]');
         if (!feed) return [];
-        const [author, mid] = getFeedInfo(feed) || [];
+        const [author, mid] = downloader.FeedDownloader.getFeedInfo(feed) || [];
         if (!author || !mid) return [];
         return [{
           title: i18n.downloadFeed,
           onclick() {
-            const feedDownloader = new downloader.FeedDownloader();
+            const feedDownloader = new downloader.FeedDownloader('./wbg/feed/single/');
             feedDownloader.download(author, mid);
           },
         }];
       });
     },
   });
+
+  i18n.batchFeedDownloadGroupTitle = {
+    cn: '批量下载',
+  };
+
+  const batchGroup = feedDownload.batch = {};
+  batchGroup.batch = rule.Group({
+    parent: feedDownload.feedDownload,
+    template: () => i18n.batchFeedDownloadGroupTitle,
+  });
+
+  Object.assign(i18n, {
+    batchFeedDownload: {
+      cn: '批量微博下载',
+    },
+    downloadOnPageSelector: {
+      cn: '在翻页选择处显示批量下载功能',
+    },
+  });
+
+  batchGroup.downloadOnPageSelector = rule.Rule({
+    id: 'download_on_page_selector',
+    version: 1,
+    parent: batchGroup.batch,
+    initial: true,
+    template: () => i18n.downloadOnPageSelector,
+    ainit() {
+      batch.handler.add({
+        type: 'feed',
+        name: i18n.batchFeedDownload,
+        handler(param) {
+          batch.feedDownload.showDialog(param);
+        },
+      });
+    },
+  });
+
+  i18n.batchFeedRangeGroupTitle = {
+    cn: '下载范围',
+  };
+
+  const range = feedDownload.range = {};
+  range.range = rule.Group({
+    parent: feedDownload.feedDownload,
+    template: () => i18n.batchFeedRangeGroupTitle,
+  });
+
+  css.append('');
+
+  Object.assign(i18n, {
+    batchFeedRangePage: {
+      cn: '下载从第{{first}}页到第{{last}}页的微博',
+    },
+  });
+
+  range.pages = rule.Rule({
+    id: 'download_page_range',
+    version: 1,
+    parent: range.range,
+    initial: true,
+    template: () => i18n.batchFeedRangePage,
+    disabled: true,
+    feedDownload: true,
+    always: true,
+    ref: {
+      first: {
+        render() {
+          return document.createTextNode(this.current);
+        },
+      },
+      last: {
+        type: 'number',
+        get min() {
+          return this.current;
+        },
+        get max() {
+          return this.total;
+        },
+      },
+    },
+  });
+
 
 }());
