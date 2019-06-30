@@ -1,4 +1,4 @@
-; (async function () {
+﻿; (async function () {
 
   const yawf = window.yawf;
   const message = yawf.message;
@@ -9,15 +9,19 @@
       filename,
       conflictAction: 'overwrite',
     });
-    return new Promise(async resolve => {
+    return new Promise(async (resolve, reject) => {
       const downloadFinish = function () {
         browser.downloads.onChanged.removeListener(downloadOnChanged);
         resolve();
       };
       const downloadOnChanged = function ({ id, state }) {
         if (id !== downloadId) return;
-        if (!state || state.current !== 'complete') return;
-        downloadFinish();
+        if (state && state.current === 'complete') {
+          downloadFinish();
+        }
+        if (state && state.current === 'interrupted') {
+          reject(new Error('Download Failed'));
+        }
       };
       browser.downloads.onChanged.addListener(downloadOnChanged);
       const [downloadItem] = await browser.downloads.search({ id: downloadId });

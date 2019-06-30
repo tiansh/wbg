@@ -35,7 +35,7 @@
   });
 
   const startDownload = async function ({ url, first, last }) {
-    const fetcher = new request.FeedListFetcher({ url, first, last });
+    const fetcher = new request.ProfileFeedListFetcher({ url, first, last });
     const progressDialog = batch.progress.start({
       dialog: {
         title: i18n.feedDownloadDialogTitle,
@@ -50,6 +50,8 @@
     });
     await fetcher.consume(async feed => {
       const [author, mid] = downloader.FeedDownloader.getFeedInfo(feed);
+      const oid = fetcher.current.config.oid;
+      if (author !== oid) return;
       await feedDownloader.download(author, mid);
     });
     progressDialog.hide();

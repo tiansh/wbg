@@ -56,6 +56,7 @@
     id: 'download_as_text',
     version: 1,
     parent: content.content,
+    initial: true,
     template: () => i18n.downloadAsText,
     init() {
       this.addConfigListener(config => {
@@ -68,7 +69,6 @@
     id: 'download_as_html',
     version: 1,
     parent: content.content,
-    initial: true,
     template: () => i18n.downloadAsHtml,
     ref: {
       optimize: { type: 'boolean', initial: true },
@@ -181,7 +181,7 @@
       cn: '批量微博下载',
     },
     downloadOnPageSelector: {
-      cn: '在翻页选择处显示批量下载功能',
+      cn: '在个人主页微博列表翻页选择处显示批量下载功能',
     },
   });
 
@@ -195,6 +195,9 @@
       batch.handler.add({
         type: 'feed',
         name: i18n.batchFeedDownload,
+        context(container) {
+          return Boolean(container.closest('[id^="Pl_Official_MyProfileFeed__"]'));
+        },
         handler(param) {
           batch.feedDownload.showDialog(param);
         },

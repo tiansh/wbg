@@ -61,6 +61,7 @@
 
         "yaofang/common/network/network.js",
         "yaofang/content/request/longfeed.js",
+        "content/request/progress.js",
         "content/request/list.js",
         "content/request/feed.js",
 

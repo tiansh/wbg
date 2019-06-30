@@ -6,52 +6,7 @@
 
   const parse = util.parse;
 
-  class Progresser {
-    /**
-     * @param {number} max
-     * @param {number} value
-     */
-    constructor(max = null, value = null) {
-      this.max = max;
-      this.value = value;
-      /** @type {Funciton[]} */
-      this.listenerList = [];
-      this.triggerUpdate();
-    }
-    clear() {
-      this.max = this.value = null;
-      this.triggerUpdate();
-    }
-    setMax(max) {
-      this.max = max;
-      if (!this.value) this.value = 0;
-      this.triggerUpdate();
-    }
-    setValue(value) {
-      if (value < 0 || value > this.max) return;
-      this.value = value;
-      this.triggerUpdate();
-    }
-    incValue() {
-      if (this.value === null) return;
-      this.setValue(this.value + 1);
-    }
-    getMax() { return this.max; }
-    getValue() { return this.value; }
-    addUpdateListener(listener) {
-      if (this.listenerList.includes(listener)) return;
-      this.listenerList.push(listener);
-    }
-    triggerUpdate() {
-      this.listenerList.forEach(listener => {
-        try {
-          listener({ max: this.max, value: this.value });
-        } catch (e) {
-          util.debug('Failed to execute Progresser listener: %o', e);
-        }
-      });
-    }
-  }
+  const Progresser = request.Progresser;
 
   class ListFetcher {
     constructor({ url, first, last, delay = 5000 }) {
@@ -148,7 +103,7 @@
     }
   }
 
-  class FeedListFetcher extends ListFetcher {
+  class ProfileFeedListFetcher extends ListFetcher {
     constructor(conf) {
       super(conf);
       this.pids = this.url.searchParams.get('pids');
@@ -159,9 +114,10 @@
       this.current.config = parse.config(dom);
       for (let model of parse.models(dom)) {
         try {
-          if (!model || !model.html || model.domid !== this.pids) continue;
-          const list = this.domParser.parseFromString(model.html, 'text/html');
-          this.current.last = this.current.first = list;
+          if (!model || !model.html) continue;
+          const dom = this.domParser.parseFromString(model.html, 'text/html');
+          if (!dom.querySelector('.WB_feed .WB_feed_type[mid]')) continue;
+          this.current.last = this.current.first = dom;
         } catch (e) { /* ignore */ }
       }
       this.current.pagebar = 0;
@@ -210,6 +166,6 @@
     }
   }
 
-  request.FeedListFetcher = FeedListFetcher;
+  request.ProfileFeedListFetcher = ProfileFeedListFetcher;
 
 }());
