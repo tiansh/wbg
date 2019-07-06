@@ -194,7 +194,7 @@
     async downloadImage(feed) {
       const imgs = Array.from(feed.querySelectorAll('.WB_media_wrap .WB_pic img'));
       if (!imgs) return;
-      await Promise.resolve(imgs.map(async img => {
+      await Promise.all(imgs.map(async img => {
         const host = new URL(img.src).host;
         const filename = img.src.split('/').pop();
         const url = `https://${host}/large/${filename}`;

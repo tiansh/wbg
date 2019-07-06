@@ -9,23 +9,33 @@
       filename,
       conflictAction: 'overwrite',
     });
-    return new Promise(async (resolve, reject) => {
-      const downloadFinish = function () {
+    return new Promise((resolve, reject) => {
+      const downloadFinish = async function (error) {
         browser.downloads.onChanged.removeListener(downloadOnChanged);
-        resolve();
+        if (error) {
+          reject(error);
+        }
+        try {
+          await browser.downloads.erase({ id: downloadId });
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      };
+      const stateUpdate = function (state) {
+        if (!state || state === 'in_progress') return;
+        if (state === 'complete') downloadFinish();
+        else downloadFinish(new Error('Download Failed'));
       };
       const downloadOnChanged = function ({ id, state }) {
         if (id !== downloadId) return;
-        if (state && state.current === 'complete') {
-          downloadFinish();
-        }
-        if (state && state.current === 'interrupted') {
-          reject(new Error('Download Failed'));
-        }
+        if (state) stateUpdate(state.current);
       };
       browser.downloads.onChanged.addListener(downloadOnChanged);
-      const [downloadItem] = await browser.downloads.search({ id: downloadId });
-      if (downloadItem.state === 'complete') downloadFinish();
+      const downloadItemPromise = browser.downloads.search({ id: downloadId });
+      downloadItemPromise.then(([downloadItem]) => {
+        stateUpdate(downloadItem.state);
+      }, error => downloadFinish(new Error(error)));
     });
   };
 
