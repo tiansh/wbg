@@ -46,7 +46,7 @@
       fetcher,
     });
     const feedDownloader = new downloader.FeedDownloader({
-      path: `./wbg/feed/batch-${timestamp.getDateTime()}/$year$month/$author/`,
+      path: `./wbg/feed/batch-${timestamp.getDateTime()}/$author/$year$month/`,
     });
     await fetcher.consume(async feed => {
       const [author, mid] = downloader.FeedDownloader.getFeedInfo(feed);

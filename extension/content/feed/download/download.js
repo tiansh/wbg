@@ -46,10 +46,11 @@
   };
 
   class FileDownloader {
-    constructor(basePath = '/', useCache = false) {
+    constructor(basePath = '/', useCache = false, timeout = 300e3) {
       /** @type {Map<string, Set<string>>} */
       this.cache = useCache ? new Map() : null;
       this.basePath = new URL(basePath.replace(/\/?$/, '/'), 'file:///');
+      this.timeout = timeout;
     }
     setPathParamResolver(resolver) {
       /** @type {FilePathParamResolver} */
@@ -74,6 +75,14 @@
       }).replace(/\$\$/g, () => '$');
       return this.normalizeFilename(paramPath);
     }
+    async downloadFile({ url, filename }) {
+      await Promise.race([
+        message.invoke.downloadFile({ url, filename }),
+        new Promise((resolve, reject) => {
+          setTimeout(() => reject(Error('Timeout')), this.timeout);
+        }),
+      ]);
+    }
     async downloadFromUrl(url, dest) {
       const source = new URL(url).href;
       if (this.cache) {
@@ -86,7 +95,7 @@
       if (sourceCache && sourceCache.has(filename)) {
         return filename;
       }
-      await message.invoke.downloadFile({ url: source, filename });
+      await this.downloadFile({ url: source, filename });
       if (sourceCache) {
         sourceCache.add(filename);
       }
@@ -102,7 +111,7 @@
         const fileReader = new FileReader();
         fileReader.addEventListener('load', async () => {
           const url = fileReader.result;
-          await message.invoke.downloadFile({ url, filename });
+          await this.downloadFile({ url, filename });
           resolve(filename);
         });
         fileReader.readAsDataURL(blob);
@@ -152,7 +161,7 @@
     }
     getMonth() {
       const [date] = feedParser.date.date(this.feed, true);
-      return String(new Date(Number(date) + 28800e3).getUTCMonth()).padStart(2, 0);
+      return String(new Date(Number(date) + 28800e3).getUTCMonth() + 1).padStart(2, 0);
     }
   }
 

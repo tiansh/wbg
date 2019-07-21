@@ -11,7 +11,7 @@
   timestamp.getDate = function (date) {
     if (!date) date = new Date();
     const year = String(date.getFullYear());
-    const month = String(new Date().getMonth()).padStart(2, 0);
+    const month = String(new Date().getMonth() + 1).padStart(2, 0);
     const day = String(new Date().getDate()).padStart(2, 0);
     return year + month + day;
   };
