@@ -9,15 +9,19 @@
   const Progresser = request.Progresser;
 
   class ListFetcher {
-    constructor({ url, first, last, delay = 5000 }) {
+    constructor({ url, first, last, pageDelay = 5000, itemDelay = 200 }) {
       this.url = new URL(url);
       this.first = Number(first);
       this.last = Number(last);
-      this.delay = delay;
+      this.pageDelay = pageDelay;
+      this.itemDelay = itemDelay;
       this.buffer = [];
       this.consumed = false;
       this.pageProgress = new Progresser(this.last - this.first + 1);
       this.itemProgress = new Progresser();
+    }
+    async delay(duration) {
+      await new Promise(resolve => setTimeout(resolve, duration));
     }
     async *fetch() {
       this.pageProgress.setValue(0);
@@ -30,7 +34,7 @@
         yield* this.getPageItems();
         this.pageProgress.incValue();
         if (page === this.last) break;
-        await new Promise(resolve => setTimeout(resolve, this.delay));
+        await this.delay(this.pageDelay);
       }
     }
     async *getPageItems() {
@@ -93,6 +97,7 @@
       for await (let item of this.fetch()) {
         try {
           await consumer(item);
+          await this.delay(this.itemDelay);
         } catch (e) {
           util.debug('Error while invoke items consumer: %o', e);
         }
@@ -155,14 +160,14 @@
       url.searchParams.set('domain', fetcher.current.config.domain);
       params.forEach((value, name) => { url.searchParams.set(name, value); });
       url.searchParams.set('__rnd', new Date().valueOf());
-      return (async function () {
-        await new Promise(resolve => setTimeout(resolve, fetcher.delay));
+      return ((async () => {
+        await this.delay(this.pageDelay);
         const resp = await fetch(url.href, { credentials: 'same-origin' }).then(resp => resp.text());
         const snippet = JSON.parse(resp).data;
         const dom = fetcher.domParser.parseFromString(snippet, 'text/html');
         fetcher.current.last = dom;
         return Array.from(dom.querySelectorAll('.WB_feed_type[mid]'));
-      }());
+      })());
     }
   }
 

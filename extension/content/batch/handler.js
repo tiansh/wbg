@@ -11,8 +11,8 @@
 
   const handler = batch.handler = {};
 
-  /** @typedef {'feed'} HandlerType */
-  /** @type {Map<HandlerType, { name: string, handler: Function }[]>} */
+  /** @typedef {'feed'|'comment'} HandlerType */
+  /** @type {Map<HandlerType, { name: string, handler: Function, context: Function? }[]>} */
   const handlers = new Map();
 
   observer.dom.add(function () {
@@ -34,17 +34,20 @@
     const itemList = document.querySelector(`[id*="${itemListName}"i]`);
     if (!itemList) return;
     const isFeed = itemList.querySelector('[node-type="feed_list"]');
-    if (!isFeed) return;
+    const isComment = itemList.querySelector('[node-type="comment_lists"]');
+    if (!isFeed && !isComment) return;
     const batchContainer = pagesRef.cloneNode(false);
     batchContainer.classList.add('wbg-batch-handler');
     if (isFeed) batchContainer.classList.add('wbg-batch-feed');
+    if (isComment) batchContainer.classList.add('wbg-batch-comment');
     link.searchParams.set('page', currentPage);
     link.hash = '';
     batchContainer.dataset.url = link.href;
     batchContainer.dataset.current = currentPage;
     batchContainer.dataset.total = totalPage;
     pagesRef.parentNode.insertBefore(batchContainer, pagesRef.nextSibling);
-    const fitHandlers = isFeed ? handlers.get('feed') : [];
+    const typeName = isFeed ? 'feed' : isComment ? 'comment' : null;
+    const fitHandlers = typeName ? handlers.get(typeName) : [];
     fitHandlers.forEach(handler => {
       addHandler(batchContainer, handler);
     });
@@ -55,17 +58,21 @@
    * @param {HandlerType} config.type
    * @param {string} config.name
    * @param {string} config.handler
+   * @param {Function} config.context
    */
-  handler.add = function ({ type, name, handler }) {
-    const selector = type === 'feed' ? 'wbg-batch-feed' : null;
+  handler.add = function ({ type, name, handler, context }) {
+    let selector;
+    if (type === 'feed') selector = '.wbg-batch-feed';
+    if (type === 'comment') selector = '.wbg-batch-comment';
     Array.from(document.querySelectorAll(selector)).forEach(container => {
       addHandler(container, { name, handler });
     });
     if (!handlers.has(type)) handlers.set(type, []);
-    handlers.get(type).push({ name, handler });
+    handlers.get(type).push({ name, handler, context });
   };
 
-  const addHandler = function (container, { name, handler }) {
+  const addHandler = function (container, { name, handler, context }) {
+    if (context && !context(container)) return;
     const wrap = document.createElement('div');
     wrap.innerHTML = '<a class="wbg-batch-button S_txt1" href="javascript:;"></a>';
     const button = wrap.firstChild;

@@ -13,6 +13,9 @@ module.exports = {
     worker: true,
     webextensions: true,
   },
+  globals: {
+    content: 'readonly',
+  },
 	"rules": {
     'linebreak-style': ['warn', 'unix'],
     'unicode-bom': ['warn', 'never'],

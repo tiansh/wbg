@@ -63,7 +63,9 @@
         "yaofang/content/request/longfeed.js",
         "content/request/progress.js",
         "content/request/list.js",
+        "content/request/delete.js",
         "content/request/feed.js",
+        "content/request/deletecomment.js",
 
         "yaofang/content/storage/storage.js",
         "yaofang/content/storage/config.js",
@@ -88,6 +90,9 @@
         "content/feed/download/download.js",
         "content/feed/download/batch.js",
         "content/feed/download/setting.js",
+
+        "content/comment/delete/batch.js",
+        "content/comment/delete/setting.js",
 
         "yaofang/content/rule/about/about.js",
         "content/about/export.js",
