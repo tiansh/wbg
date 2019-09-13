@@ -7,6 +7,8 @@ import argparse
 def copy_file(src, dest):
     try: os.makedirs(os.path.dirname(dest))
     except FileExistsError: pass
+    if not os.path.isfile(src):
+        raise FileNotFoundError()
     shutil.copy2(src, dest)
 
 def copy_yaofang_files(yaofang):

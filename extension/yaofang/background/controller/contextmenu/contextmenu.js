@@ -1,9 +1,10 @@
 /**
  * 处理浏览器右键菜单
  */
-; (async function () {
+; (function () {
 
   const yawf = window.yawf;
+  const env = yawf.env;
   const message = yawf.message;
   const browserInfo = yawf.browserInfo;
 
@@ -28,7 +29,7 @@
      * @param {string} title
      * @param {string} accessKey
      */
-    return function (title, accessKey) {
+    return function (title, accessKey = null) {
       let key = null;
       if (accessKey && /^[0-9A-Za-z]/.test(accessKey)) {
         key = accessKey.toUpperCase();
@@ -56,7 +57,7 @@
     if (!Array.isArray(items) || !items.length) return;
     browser.menus.removeAll();
     const rootMenu = browser.menus.create({
-      title: menuTitleWithAccessKey(browser.i18n.getMessage('extensionName'), 'Y'),
+      title: menuTitleWithAccessKey(browser.i18n.getMessage('extensionName'), env.config.contextMenuKey),
     });
     items.forEach(({ title, accessKey = null, data }) => {
       browser.menus.create({
@@ -78,6 +79,34 @@
     if (!lastContextMenuClicked) {
       message.invoke().contextMenuHidden();
     }
+  });
+
+
+  browser.menus.onShown.addListener(async (info, tab) => {
+    if (!info.contexts.includes('tab')) return;
+    const contextMenuIndex = ++lastContextMenuIndex;
+    let items;
+    try {
+      items = await message.invoke(tab.id).listExternalMenu();
+    } catch (e) {
+      /* no menu */
+    }
+    if (contextMenuIndex !== lastContextMenuIndex) return;
+    if (!items || !items.length) return;
+    const rootMenu = browser.menus.create({
+      title: menuTitleWithAccessKey(browser.i18n.getMessage('extensionName'), env.config.contextMenuKey),
+      contexts: ['tab'],
+    });
+    items.forEach(({ title, id }) => {
+      browser.menus.create({
+        parentId: rootMenu,
+        title: menuTitleWithAccessKey(title, null),
+        onclick: function () {
+          message.invoke(tab.id).externalMenuClicked(id);
+        },
+      });
+    });
+    browser.menus.refresh();
   });
 
 }());

@@ -9,11 +9,6 @@
     configDialogTitle: {
       cn: '设置 - 小工具',
     },
-    aboutTabTitle: {
-      cn: '关于冰糕',
-      tw: '關於冰糕',
-      en: 'About',
-    },
     installSuccessTitle: { cn: '微博冰糕 (WBG) 安装成功', tw: '微博冰糕 (WBG) 安裝成功', en: 'Weibo Batch Genius Installation successed' },
     installSuccessText: {
       cn: '感谢您安装微博冰糕 (WBG) 扩展。您可以在右上角设置菜单中找到扩展相关的设置。',

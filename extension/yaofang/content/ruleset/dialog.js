@@ -1,7 +1,7 @@
 /**
  * 这个文件用于显示一个显示了若干条规则的对话框
  */
-; (async function () {
+; (function () {
 
   const yawf = window.yawf;
   const util = yawf.util;
@@ -49,7 +49,7 @@
   };
   configDom.layer = () => {
     const container = document.createElement('div');
-    container.innerHTML = '<div class="yawf-config-layer" node-type="searchFilterGroupLayer"></div>';
+    container.innerHTML = '<div class="yawf-config-layer"></div>';
     return container.removeChild(container.firstChild);
   };
 
@@ -94,37 +94,58 @@
    * @param {Element} inner
    * @param {Array<Tab>} tabs
    */
-  const renderTabs = function (inner, tabs) {
+  const renderTabs = function (inner, tabs, { initial = null } = {}) {
     inner.classList.add('yawf-config-inner');
     const left = inner.appendChild(configDom.left());
     const right = inner.appendChild(configDom.right());
     const tablist = left.querySelector('ul');
     const search = tablist.appendChild(configDom.search());
     const searchInput = search.querySelector('input');
-    const layer = right.appendChild(configDom.layer());
     /** @type {Element?} */
     let current = null;
     /** @type {WeakMap<Element, Function>} */
     const tabInit = new WeakMap();
-    const tabLeft = tabs.map(tab => {
+    const tabLayer = tabs.map(tab => {
+      const layer = right.appendChild(configDom.layer());
+      return layer;
+    });
+    const hideAllLayer = function () {
+      [...tabLayer, searchLayer].forEach(layer => {
+        if (layer.style.display !== 'none') {
+          layer.style.display = 'none';
+        }
+      });
+    };
+    const tabLeft = tabs.map((tab, index) => {
+      const layer = tabLayer[index];
       const tabLeft = tablist.appendChild(configDom.item(tab.getRenderResult()));
       tabInit.set(tabLeft, () => {
+        hideAllLayer();
+        layer.innerHTML = '';
         render(layer, rule.query({ base: [tab] }));
+        layer.style.display = 'block';
       });
       return tabLeft;
     });
-    tabInit.set(search, () => { renderSearch(layer, searchInput.value); });
+    const searchLayer = right.appendChild(configDom.layer());
+    searchLayer.classList.add('yawf-config-layer-search');
+    tabInit.set(search, () => {
+      hideAllLayer();
+      searchLayer.innerHTML = '';
+      renderSearch(searchLayer, searchInput.value);
+      searchLayer.style.display = 'block';
+    });
     const setCurrent = tabLeft => {
       if (current === tabLeft) return;
       if (current) current.classList.remove('current');
       current = tabLeft;
       tabLeft.classList.add('current');
       if (search !== tabLeft && searchInput.value) searchInput.value = '';
-      layer.innerHTML = '';
       tabInit.get(tabLeft)();
+      right.scrollTo(0, 0);
     };
-    // 自动选中第一个选项卡
-    setCurrent(tabLeft[0]);
+    // 自动选中目标选项卡，或第一个选项卡
+    setCurrent(tabLeft[(initial && tabs.indexOf(initial) + 1 || 1) - 1]);
     left.addEventListener('click', event => {
       const tabLeft = event.target.closest('.yawf-config-tab');
       if (!tabLeft) return;
@@ -135,7 +156,7 @@
     searchInput.addEventListener('input', event => {
       if (!searchInput.value && current !== search) return;
       if (current !== search) setCurrent(search);
-      else renderSearch(layer, searchInput.value);
+      else tabInit.get(search)();
     });
   };
 
@@ -164,13 +185,13 @@
   };
   rule.render = render;
 
-  rule.dialog = function (rules = null) {
+  rule.dialog = function (tab) {
     try {
       ui.dialog({
         id: 'yawf-config',
         title: i18n.configDialogTitle,
         render: inner => {
-          if (!rules) renderTabs(inner, tabs);
+          renderTabs(inner, tabs, { initial: tab });
         },
       }).show();
     } catch (e) { util.debug('Error while showing rule dialog %o', e); }

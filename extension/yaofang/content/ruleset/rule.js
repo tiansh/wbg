@@ -25,6 +25,7 @@
  *   users: 多个用户（id）
  *   usernames: 多个用户名
  *   topics: 多个话题
+ *   key: 一个键盘按键
  *
  * ConfigItem 的属性和方法包括：
  * 显示相关
@@ -79,7 +80,7 @@
  *   base: Array<RuleItem> = yawf.rule.tabs
  * }): Array<Rule> 用于根据筛选条件列出对应的规则
  */
-; (async function () {
+; (function () {
 
   const yawf = window.yawf;
 
@@ -522,12 +523,12 @@
       const renderOptions = items => {
         items.forEach(({ text, value, style = null }) => {
           const option = document.createElement('option');
-          option.value = value;
+          option.value = JSON.stringify(value);
           option.text = typeof text === 'function' ? text() : text;
           if (style) option.style += ';' + style;
           select.add(option);
         });
-        select.value = this.getConfig();
+        select.value = JSON.stringify(this.getConfig());
       };
       if (Array.isArray(this.select)) renderOptions(this.select);
       else Promise.resolve(this.select).then(items => {
@@ -537,7 +538,7 @@
       select.addEventListener('change', event => {
         if (!event.isTrusted) {
           this.renderValue(container);
-        } else this.setConfig(select.value);
+        } else this.setConfig(JSON.parse(select.value));
       });
       container.appendChild(select);
       return container;
@@ -547,8 +548,9 @@
       const selector = `select[yawf-config-input="${this.configId}"]`;
       const select = container.querySelector(selector);
       const config = this.getConfig();
-      if (select && select.value !== config) {
-        select.value = config;
+      const configStr = JSON.stringify(config);
+      if (select && select.value !== configStr) {
+        select.value = configStr;
       }
       return container;
     }
@@ -716,6 +718,108 @@
       const config = this.getConfig();
       if (color && color.value !== config) {
         color.value = config;
+      }
+      return container;
+    }
+  }
+  rule.class.ColorConfigItem = ColorConfigItem;
+
+  i18n.keyboardDisabled = {
+    cn: '（已禁用）',
+    tw: '（已停用）',
+    en: '(Disabled)',
+  };
+
+  /**
+   * 一个设置按键的设置项
+   */
+  class KeyboardConfigItem extends ConfigItem {
+    constructor(item, parent) {
+      super(item, parent);
+    }
+    get initial() { return null; }
+    normalize(value) {
+      if (value === null) return null;
+      if (typeof value !== 'number') return this.initial;
+      if (value < 0 || value > keyboard.alter.MAX) return this.initial;
+      return value;
+    }
+    render() {
+      const container = document.createElement('span');
+      container.setAttribute('yawf-config-item', this.configId);
+      container.classList.add('yawf-config-key');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = keyboard.name(this.getConfig());
+      button.addEventListener('keydown', event => {
+        if (!event.isTrusted) return;
+        const code = keyboard.event(event);
+        if (code === keyboard.code.TAB) return;
+        if (code === keyboard.code.TAB + keyboard.alter.SHIFT) return;
+        if (code === keyboard.code.ESC) {
+          this.setConfig(null);
+        } else {
+          this.setConfig(code);
+        }
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
+      button.setAttribute('yawf-config-input', this.configId);
+      container.appendChild(button);
+      return container;
+    }
+    renderValue(container) {
+      container = super.renderValue(container);
+      const selector = `button[type="button"][yawf-config-input="${this.configId}"]`;
+      const button = container.querySelector(selector);
+      const config = this.getConfig();
+      const text = config ? keyboard.name(config) : i18n.keyboardDisabled;
+      if (button && button.textContent !== text) {
+        button.textContent = text;
+      }
+      return container;
+    }
+  }
+  rule.class.KeyboardConfigItem = KeyboardConfigItem;
+
+  /**
+   * 一个文本输入框
+   * 对应一个 textarea 输入框
+   */
+  class TextConfigItem extends ConfigItem {
+    constructor(item, parent) {
+      super(item, parent);
+    }
+    get initial() { return ''; }
+    normalize(value) {
+      if (typeof value !== 'string') return this.initial;
+      return value;
+    }
+    render() {
+      const container = document.createElement('span');
+      container.setAttribute('yawf-config-item', this.configId);
+      container.classList.add('yawf-config-text');
+      const textarea = document.createElement('textarea');
+      textarea.classList.add('yawf-config-textarea', 'W_input');
+      textarea.value = this.getConfig();
+      textarea.addEventListener('input', event => {
+        if (!event.isTrusted) textarea.value = this.getConfig();
+        else this.setConfig(textarea.value);
+      });
+      textarea.addEventListener('blur', event => {
+        this.renderValue(container);
+      });
+      textarea.setAttribute('yawf-config-input', this.configId);
+      container.appendChild(textarea);
+      return container;
+    }
+    renderValue(container) {
+      container = super.renderValue(container);
+      const selector = `textarea[yawf-config-input="${this.configId}"]`;
+      const textarea = container.querySelector(selector);
+      const config = this.getConfig();
+      if (textarea && textarea.value !== config) {
+        textarea.value = config;
       }
       return container;
     }
@@ -1089,7 +1193,7 @@
       const index = values.findIndex((item, index) => this.track(item, index) === track);
       if (index !== -1) {
         values.splice(index, 1);
-        if (!this.configCacheDirty) {
+        if (!this.configCacheDirty && Array.isArray(this.configCache)) {
           this.configCache.splice(index, 1);
         }
       }
@@ -1244,6 +1348,7 @@
     if (item.type === 'number') return new NumberConfigItem(item, parent);
     if (item.type === 'range') return new RangeConfigItem(item, parent);
     if (item.type === 'color') return new ColorConfigItem(item, parent);
+    if (item.type === 'text') return new TextConfigItem(item, parent);
     if (item.type === 'bubble') return new BubbleConfigItem(item, parent);
     if (item.type === 'strings') return new StringCollectionConfigItem(item, parent);
     if (item.type === 'regexen') return new RegExpCollectionConfigItem(item, parent);
@@ -1251,6 +1356,7 @@
     if (item.type === 'usernames') return new UserNameCollectionConfigItem(item, parent);
     if (item.type === 'topics') return new TopicCollectionConfigItem(item, parent);
     if (item.type === 'groups') return new GroupIdCollectionConfigItem(item, parent);
+    if (item.type === 'key') return new KeyboardConfigItem(item, parent);
     if (item.type === 'offscreen') return new OffscreenConfigItem(item, parent);
     return new ConfigItem(item, parent);
   };
@@ -1416,9 +1522,9 @@
     rule.query().forEach(rule => rule.execute());
   };
 
-  init.onReady(async () => {
+  init.onReady(() => {
     rule.init();
-  }, { priority: priority.DEFAULT, async: true });
+  }, { priority: priority.DEFAULT });
 
   css.append(`
 .yawf-config-group { display: block; font-weight: bold; margin: 15px 10px 5px; }
@@ -1427,17 +1533,20 @@
 .yawf-config-rule > label + label { margin-left: 8px; }
 .yawf-config-rule > br + label { margin-left: 20px; }
 .yawf-bubble-icon { vertical-align: middle; margin-left: 2px; margin-right: 2px; }
+.yawf-config-select { height: 20px; }
 .yawf-config-number input[type="number"] { width: 45px; box-sizing: border-box; }
 .yawf-config-range { position: relative; }
 .yawf-config-range-wrap { display: none; position: absolute; left: 0; right: 0; margin: 0; bottom: calc(100% + 2px); height: 80px; background: #f0f0f0; background: Menu; }
 .yawf-config-range:focus-within .yawf-config-range-wrap { display: block; }
 .yawf-config-range input[type="range"] { position: absolute; top: 0; bottom: 0; margin: auto; width: 75px; right: -20px; left: -20px; transform: rotate(-90deg); }
 .yawf-config-color input[type="color"] { width: 45px; box-sizing: border-box; height: 20px; vertical-align: middle; }
+.yawf-config-text textarea { width: calc(100% - 20px); padding-left: 10px; padding-right: 10px; min-height: 120px; resize: vertical; }
 .yawf-config-collection-input { margin: 5px; }
 .yawf-config-collection-list { display: block; margin: 5px; }
 .yawf-config-collection-list .yawf-config-collection-item { padding: 0 5px 0 20px; min-width: 0; height: 20px; overflow: hidden; text-overflow: ellipsis; cursor: default; }
 .yawf-config-collection-remove { display: block; position: absolute; top: 0; left: 0; display: flow-root; width: 20px; height: 20px; line-height: 20px; }
 .yawf-config-collection-item-content { max-width: 500px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.yawf-config-collection-user-id .yawf-config-collection-list { margin-left: -5px; }
 .yawf-config-collection-user-id .yawf-config-collection-item { width: 90px; height: 50px; padding: 1px 20px 1px 56px; text-align: left; }
 .yawf-config-collection-user-id .yawf-config-collection-remove { right: 0; left: auto; text-align: center; }
 .yawf-config-collection-user-id .yawf-config-collection-remove a { position: static; margin: 0; }

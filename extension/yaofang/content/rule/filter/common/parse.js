@@ -1,4 +1,4 @@
-; (async function () {
+; (function () {
 
   const yawf = window.yawf;
 
@@ -38,6 +38,7 @@
    * @return {boolean}
    */
   const contains = function (parent, child) {
+    if (!parent || !child) return false;
     if (!(child instanceof Node)) {
       const children = Array.from(child);
       return children.every(child => contains(parent, child));
@@ -153,6 +154,7 @@
     }
     return node.closest('[mid]');
   };
+  feedParser.feedNode = node => feedContainer(node);
 
   /**
    * 获取节点所在的评论
@@ -166,6 +168,7 @@
     }
     return node.closest('[comment_id]');
   };
+  feedParser.commentNode = node => feedContainer(node);
 
   const textParser = function (detail, containerType) {
     const parsers = [];
@@ -219,8 +222,8 @@
         topic = node.textContent.replace(/^[\s$]+|[\s$]+$/g, '');
       }
       if (topic) {
-        const [_, superTopic, text] = topic.match(/^(\ue627?)\s*(.*)$/);
-        if (superTopic && detail) return ` \ue627#${text}#`;
+        const [_, superTopic, text] = topic.match(/^(?=(\ue627?|.*\[超话\]|.*超话$))[\ue627\s]*(.*?)(?:\[超话\]|超话)?$/);
+        if (superTopic && detail) return ` #${text}[超话]# `;
         if (detail) return ` #${text}# `;
         return `#${text}#`;
       }
@@ -254,6 +257,24 @@
       return null;
     };
     parsers.push(emotion);
+
+    /**
+     * 如果我们拿到一个作者或者原作者的链接，我们还可以拿到他的那些小图标
+     * @param {Element} node
+     */
+    const userIcons = function (node) {
+      const isSearch = isSearchFeedElement(feedContainer(node));
+      const items = [];
+      if (isSearch) {
+        const sibling = [...node.parentNode.children];
+        items.push(...sibling.filter(item => item.matches('a[title]')));
+      } else {
+        items.push(...node.parentNode.querySelectorAll('[title]'));
+      }
+      const icons = items.filter(item => item !== node && item.title.trim());
+      return icons.map(icon => `[${icon.title.trim()}]`);
+    };
+
     /**
      * @作者（文本✗，正则✓）
      * @param {Element} node
@@ -261,7 +282,9 @@
     const author = node => {
       if (!node.matches('.WB_detail > .WB_info > .W_fb[usercard]')) return null;
       if (!detail) return '';
-      return '@' + node.textContent;
+      const name = '@' + node.textContent.trim();
+      const icons = userIcons(node);
+      return [name, ...icons].join(' ');
     };
     parsers.push(author);
     /**
@@ -271,7 +294,9 @@
     const original = node => {
       if (!node.matches('.WB_expand > .WB_info > .W_fb[usercard]')) return null;
       if (!detail) return '';
-      return node.textContent.replace(/^@?/, '@');
+      const name = node.textContent.trim().replace(/^@?/, '@');
+      const icons = userIcons(node);
+      return [name, ...icons].join(' ');
     };
     parsers.push(original);
     /**
@@ -519,7 +544,7 @@
   };
   author.name = feed => {
     const domList = author.dom(feed);
-    return domList.map(dom => dom.textContent);
+    return domList.map(dom => dom.textContent.trim());
   };
   author.avatar = feed => {
     const domList = author.dom(feed);
@@ -558,7 +583,7 @@
   };
   original.name = feed => {
     const domList = original.dom(feed);
-    return domList.map(dom => dom.textContent);
+    return domList.map(dom => dom.textContent.trim());
   };
 
   // 提到（微博中提到的人，转发路径中的人同属于提到）
@@ -566,9 +591,10 @@
   mention.dom = (feed, { short = false, long = true } = {}) => {
     const contents = feedContentElements(feed, { short, long });
     if (!isSearchFeedElement(feed)) {
-      const domList = contents.map(content => content ? Array.from(content.querySelectorAll(
-        'a[href*="loc=at"][usercard*="name"]',
-      )) : []).reduce((x, y) => x.concat(y));
+      const domList = contents.map(content => {
+        if (!content) return [];
+        return Array.from(content.querySelectorAll('a[href*="loc=at"][usercard*="name"]'));
+      }).reduce((x, y) => x.concat(y));
       return domList;
     } else {
       const linkList = contents.map(content => (
@@ -626,7 +652,7 @@
     const domList = topic.dom(feed, { short, long });
     return domList.map(dom => {
       const text = dom.title || dom.textContent;
-      return text.replace(/[#\ue627]/g, '').trim();
+      return text.replace(/[#\ue627]|\[超话\]$/g, '').trim();
     });
   };
 
@@ -724,6 +750,9 @@
   feedParser.isFeed = feed => isFeedElement(feed);
   feedParser.isSearchFeed = feed => isSearchFeedElement(feed);
   feedParser.isForward = feed => isForwardFeedElement(feed);
+
+  feedParser.mid = node => feedContainer(node).getAttribute('mid');
+  feedParser.omid = node => feedContainer(node).getAttribute('omid');
 
   // 评论内容
   commentParser.text = target => {

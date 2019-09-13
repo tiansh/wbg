@@ -22,6 +22,7 @@
 
   "background": {
     "scripts": [
+      "common/global/env.js",
       "yaofang/common/browser/browser.js",
       "yaofang/common/util/functools.js",
 
@@ -43,6 +44,7 @@
         "https://api.weibo.com/chat*"
       ],
       "js": [
+        "common/global/env.js",
         "yaofang/common/browser/browser.js",
         "yaofang/common/util/functools.js",
         "yaofang/common/util/urls.js",
@@ -94,11 +96,11 @@
         "content/comment/delete/batch.js",
         "content/comment/delete/setting.js",
 
-        "yaofang/content/rule/about/about.js",
-        "content/about/export.js",
+        "content/rule/about/about.js",
+        "content/rule/about/export.js",
         "yaofang/content/rule/about/whatsnew.js",
-        "yaofang/content/rule/about/debug.js",
-        "content/about/script.js",
+        "content/rule/about/debug.js",
+        "content/rule/about/script.js",
 
         "content/main/entry.js",
 
