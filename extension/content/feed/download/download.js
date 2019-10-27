@@ -227,7 +227,7 @@
       if (!mid) return null;
       const [author] = feedParser.author.id(feed);
       if (!author) return null;
-      return [author, mid];
+      return { author, mid };
     }
 
   }

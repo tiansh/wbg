@@ -43,7 +43,6 @@
     id: 'comment_delete_on_outbox',
     version: 1,
     parent: outbox.outbox,
-    initial: true,
     template: () => i18n.commentDeleteOnOutbox,
     ainit() {
       batch.handler.add({
@@ -82,8 +81,7 @@
     parent: range.range,
     initial: true,
     template: () => i18n.batchCommentDeleteRangePage,
-    disabled: true,
-    commentDelete: true,
+    view: 'commentDelete',
     always: true,
     ref: {
       first: {

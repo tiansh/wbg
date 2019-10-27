@@ -63,8 +63,7 @@
         header.textContent = config.dialog.header;
         const page = inner.querySelector('.wbg-progress-page');
         const item = inner.querySelector('.wbg-progress-item');
-        const { fetcher, deleter } = config;
-        const progress = (fetcher || deleter).getProgres();
+        const progress = config.fetcher.getProgres();
         renderProgress(progress.page, page, i18n.pageProgress);
         renderProgress(progress.item, item, i18n.itemProgress);
       },

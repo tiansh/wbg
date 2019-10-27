@@ -16,7 +16,7 @@
 
   const onClick = function (e) {
     try {
-      rule.dialog();
+      rule.dialog(null, rule => !rule.view);
     } catch (e) { util.debug('Error while prompting dialog: %o', e); }
     e.preventDefault();
   };

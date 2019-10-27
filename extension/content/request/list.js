@@ -4,50 +4,224 @@
   const util = yawf.util;
   const request = yawf.request = yawf.request || {};
 
+  /**
+   * @external
+   * @typedef {Object} WeiboConfig
+   * @property {string} uid
+   */
+
+  /**
+   * @external
+   * @typedef {Object} parse
+   * @property {(dom: HTMLDocument) => WeiboConfig} config
+   * @property {(dom: HTMLDocument) => IterableIterator<{ns: string, domid: string, html: string, js: string?, css: string?}>} models
+   */
+
+  /**
+   * @type {parse}
+   */
   const parse = util.parse;
 
-  const Progresser = request.Progresser;
+  class Progresser {
+    /**
+     * @param {number} max
+     * @param {number} value
+     */
+    constructor(max = null, value = null) {
+      this.max = max;
+      this.value = value;
+      /** @type {(( state: { max: number, value: number }) => any)[]} */
+      this.listenerList = [];
+      this.triggerUpdate();
+    }
+    clear() {
+      this.max = this.value = null;
+      this.triggerUpdate();
+    }
+    /** @param {number} max */
+    setMax(max) {
+      this.max = max;
+      if (!this.value) this.value = 0;
+      this.triggerUpdate();
+    }
+    /** @param {number} value */
+    setValue(value) {
+      if (value < 0 || value > this.max) return;
+      this.value = value;
+      this.triggerUpdate();
+    }
+    incValue() {
+      if (this.value === null) return;
+      this.setValue(this.value + 1);
+    }
+    getMax() { return this.max; }
+    getValue() { return this.value; }
+    /** @param {(state: { max: number, value: number }) => any} listener */
+    addUpdateListener(listener) {
+      if (this.listenerList.includes(listener)) return;
+      this.listenerList.push(listener);
+    }
+    triggerUpdate() {
+      this.listenerList.forEach(listener => {
+        try {
+          listener({ max: this.max, value: this.value });
+        } catch (e) {
+          util.debug('Failed to execute Progresser listener: %o', e);
+        }
+      });
+    }
+  }
 
+  request.Progresser = Progresser;
+
+  /**
+   * @typedef {Object} Context
+   * @property {URL} url
+   * @property {string} html
+   * @property {HTMLDocument} dom
+   * @property {WeiboConfig} config
+   */
+
+  /**
+   * @class
+   * @template ListItem
+   */
   class ListFetcher {
-    constructor({ url, first, last, pageDelay = 5000, itemDelay = 200 }) {
-      this.url = new URL(url);
+    get defaultPageDelay() { return 5000; }
+    get defaultItemDelay() { return 1000; }
+    /**
+     * @param {object} config
+     * @param {number} config.first
+     * @param {number?} config.last
+     * @param {number?} config.pageDelay
+     * @param {number?} config.itemDelay
+     * @param {boolean} config.isDelete
+     * @param {Context} context
+     */
+    constructor({ first, last = null, pageDelay, itemDelay, isDelete = false }, context) {
+      // 如果是删除用，那么随着删除，页码会跟着变化
+      // 所以没办法根据截止的页码来控制删除
+      if (isDelete && last !== null) {
+        throw new Error('Cannot set last page for deleting.');
+      }
+      this.context = context;
+
+      this.isDelete = isDelete;
+
       this.first = Number(first);
-      this.last = Number(last);
-      this.pageDelay = pageDelay;
-      this.itemDelay = itemDelay;
+      this.last = Number(last) || null;
+      /** @type {number} */
+      this.total = null;
+      this.parsed = 0;
+
+      this.pageDelay = pageDelay || this.defaultPageDelay;
+      this.itemDelay = itemDelay || this.defaultItemDelay;
+
       this.buffer = [];
       this.consumed = false;
-      this.pageProgress = new Progresser(this.last - this.first + 1);
+      this.pageProgress = new Progresser(this.last);
       this.itemProgress = new Progresser();
     }
+    /** @param {number} total */
+    setTotal(total) {
+      this.total = total;
+      if (this.isDelete) {
+        this.pageProgress.setMax(this.total - this.page + this.processed + 1);
+      }
+    }
+    /** @param {boolean} repeat */
+    nextPage(repeat) {
+      this.processed++;
+      this.page++;
+      if (this.isDelete) {
+        if (repeat) this.page--;
+        this.pageProgress.setMax(this.total - this.page + this.processed + 1);
+        this.pageProgress.setValue(this.processed);
+      } else {
+        this.pageProgress.incValue();
+      }
+    }
+    /** @returns { boolean} */
+    isDone() {
+      if (this.isDelete) {
+        // 如果是删除，那么我们只关心是不是删除到最后一页了
+        return this.total && this.page > this.total;
+      } else {
+        // 否则我们看是不是已经到了目标的页码
+        return this.page > this.last;
+      }
+    }
+    /** @param {number} duration */
     async delay(duration) {
       await new Promise(resolve => setTimeout(resolve, duration));
     }
-    async *fetch() {
+    /**
+     * @param {(item: ListItem) => boolean} callback
+     */
+    async fetch(callback) {
       this.pageProgress.setValue(0);
-      for (let page = this.first; ; page++) {
-        const url = new URL(this.url);
-        url.searchParams.set('page', page);
-        const html = await fetch(url.href, { credentials: 'same-origin' }).then(resp => resp.text());
-        const dom = new DOMParser().parseFromString(html, 'text/html');
-        this.current = { html, dom };
-        yield* this.getPageItems();
-        this.pageProgress.incValue();
-        if (page === this.last) break;
-        await this.delay(this.pageDelay);
+      this.page = this.first;
+      this.processed = 0;
+      while (!this.isDone()) {
+        if (this.processed) {
+          await this.delay(this.pageDelay);
+        }
+        const results = [];
+        for await (const item of this.getPageItems(this.context, this.page)) {
+          results.push(await callback(item));
+          await this.delay(this.itemDelay);
+        }
+        this.nextPage(this.isDelete && results.some(s => s));
       }
     }
-    async *getPageItems() {
+    /**
+     * @param {Context} context
+     * @param {number} page
+     */
+    async fetchPage(context, page) {
+      const url = new URL(context.url);
+      url.searchParams.set('page', page);
+      const html = await fetch(url.href, { credentials: 'same-origin' }).then(resp => resp.text());
+      const dom = new DOMParser().parseFromString(html, 'text/html');
+      context.html = html;
+      context.dom = dom;
+    }
+    /**
+     * 在获取一个页面之后初始化时调用
+     * @param {Context} context
+     */
+    initialPage(context) { throw new Error('unimplementated'); }
+    /**
+     * 获取加载来的第一页上的东西
+     * @param {Context} context
+     * @returns {ListItem[]}
+     */
+    getItemsOnPage(context) { throw new Error('unimplementated'); }
+    /**
+     * 返回 null 如果已经没有可加载的内容了
+     * 返回 Promise<any[]> 如果有东西（至少看起来有东西）可加载
+     * @param {Context} context
+     * @returns {null|Promise<any[]>}
+     */
+    getLazyLoadItems(context) {
+      return null;
+    }
+    /**
+     * @param {Context} context
+     * @param {number} page
+     */
+    async *getPageItems(context, page) {
       const fetcher = this;
-      fetcher.initialPage();
-      const items = fetcher.getItemsOnPage();
+      await fetcher.fetchPage(context, page);
+      fetcher.initialPage(context);
+      const items = fetcher.getItemsOnPage(context);
       let lazy = null, index = 0;
       // 这里的 async 表示我们一边勤快地处理懒加载
-      ; (async function updateLazy() {
+      const lazyLoad = (async function updateLazy() {
         try {
           while (true) {
             fetcher.itemProgress.setMax(items.length);
-            lazy = fetcher.getLazyLoadItems();
+            lazy = fetcher.getLazyLoadItems(context);
             if (!lazy) break;
             const newItems = await lazy;
             items.push(...newItems);
@@ -56,6 +230,8 @@
           lazy = Promise.reject(e);
         }
       }());
+      // 如果是删除目的，我们需要等待这一页完全加载完成才可以执行
+      if (this.isDelete) await lazyLoad;
       // 一边逐个处理单条数据
       fetcher.itemProgress.setValue(0);
       while (true) {
@@ -76,76 +252,88 @@
       }
     }
     /**
-     * 在获取一个页面之后初始化时调用
+     * @param {(item: ListItem) => boolean} consumer
      */
-    initialPage() {}
-    /**
-     * 获取加载来的第一页上的东西
-     */
-    getItemsOnPage() { return []; }
-    /**
-     * 返回 null 如果已经没有可加载的内容了
-     * 返回 Promise<any[]> 如果有东西（至少看起来有东西）可加载
-     * @returns {null|Promise<any[]>}
-     */
-    getLazyLoadItems() {
-      return null;
-    }
     async consume(consumer) {
       if (this.consumed) return;
-      this.consumed = true;
-      for await (let item of this.fetch()) {
+      await this.fetch(item => {
         try {
-          await consumer(item);
-          await this.delay(this.itemDelay);
+          return consumer(item);
         } catch (e) {
-          util.debug('Error while invoke items consumer: %o', e);
+          util.debug('Error while consume item (%o):\n%o', item, e);
+          return false;
         }
-      }
+      });
     }
     getProgres() {
       return { page: this.pageProgress, item: this.itemProgress };
     }
+    getConfig() {
+      return this.context.config;
+    }
   }
 
-  class ProfileFeedListFetcher extends ListFetcher {
-    constructor(conf) {
-      super(conf);
-      this.pids = this.url.searchParams.get('pids');
+  /**
+   * @typedef {Object} ProfileContext
+   * @property {HTMLDocument} first
+   * @property {HTMLDocument} last
+   * @property {number} pagebar
+   */
+
+  /**
+   * @extends {ListFetcher<HTMLElement>}
+   */
+  class ProfileFeedFetcher extends ListFetcher {
+    constructor(conf, context) {
+      super({ pageDelay: conf.isDelete ? 100 : 5000, itemDelay: 1000, ...conf }, context);
+      this.pids = this.context.url.searchParams.get('pids');
       this.domParser = new DOMParser();
     }
-    initialPage() {
-      const dom = this.current.dom;
-      this.current.config = parse.config(dom);
+    /** @param {Context & ProfileContext} context */
+    updateTotalPage(context) {
+      const last = context.last;
+      const list = last.querySelector('.WB_feed');
+      const pages = (list || last).querySelectorAll('a[bpfilter="page"]');
+      if (!pages.length) return;
+      const lastPage = Math.max(...[...pages].map(page => Number(new URL(page.href).searchParams.get('page'))));
+      this.setTotal(lastPage);
+    }
+    /** @param {Context & ProfileContext} context */
+    initialPage(context) {
+      const dom = context.dom;
+      context.config = parse.config(dom);
       for (let model of parse.models(dom)) {
         try {
           if (!model || !model.html) continue;
           const dom = this.domParser.parseFromString(model.html, 'text/html');
           if (!dom.querySelector('.WB_feed .WB_feed_type[mid]')) continue;
-          this.current.last = this.current.first = dom;
+          context.last = context.first = dom;
+          this.updateTotalPage(context);
         } catch (e) { /* ignore */ }
       }
-      this.current.pagebar = 0;
+      context.pagebar = 0;
     }
-    getItemsOnPage() {
-      const first = this.current.first;
+    /** @param {Context & ProfileContext} context */
+    getItemsOnPage(context) {
+      const first = context.first;
       if (!first) return [];
       return Array.from(first.querySelectorAll('.WB_feed_type[mid]'));
     }
-    getLazyLoadItems() {
+    /** @param {Context & ProfileContext} context */
+    getLazyLoadItems(context) {
       const fetcher = this;
-      const last = fetcher.current.last;
+      const last = context.last;
       if (!last) return null;
       const lazyload = last.querySelector('[node-type="lazyload"]');
       if (!lazyload) return null;
-      const params = new URLSearchParams(fetcher.url.searchParams);
-      if (fetcher.current.params) {
-        fetcher.current.params.forEach((value, name) => { params.set(name, value); });
+      const params = new URLSearchParams(context.url.searchParams);
+      if (context.params) {
+        context.params.forEach((value, name) => { params.set(name, value); });
       }
-      params.set('pagebar', fetcher.current.pagebar++);
+      params.set('pagebar', context.pagebar++);
       params.set('pl_name', fetcher.pids);
-      params.set('id', fetcher.current.config.page_id);
-      params.set('script_uri', fetcher.url.pathname);
+      params.set('id', context.config.page_id);
+      params.set('script_uri', context.url.pathname);
       const feedlist = last.querySelector('.WB_feed');
       if (feedlist) {
         params.set('feed_type', feedlist.getAttribute('feed-type') || 0);
@@ -154,10 +342,10 @@
       if (!params.has('pre_page')) params.set('pre_page', params.get('page'));
       const lazyloadData = new URLSearchParams(lazyload.getAttribute('action-data') || '');
       lazyloadData.forEach((value, name) => { params.set(name, value); });
-      params.set('domain_op', fetcher.current.config.domain || '');
-      fetcher.current.params = params;
+      params.set('domain_op', context.config.domain || '');
+      context.params = params;
       const url = new URL(`https://weibo.com/p/aj/v6/mblog/mbloglist?ajwvr=6`);
-      url.searchParams.set('domain', fetcher.current.config.domain);
+      url.searchParams.set('domain', context.config.domain);
       params.forEach((value, name) => { url.searchParams.set(name, value); });
       url.searchParams.set('__rnd', new Date().valueOf());
       return ((async () => {
@@ -165,12 +353,70 @@
         const resp = await fetch(url.href, { credentials: 'same-origin' }).then(resp => resp.text());
         const snippet = JSON.parse(resp).data;
         const dom = fetcher.domParser.parseFromString(snippet, 'text/html');
-        fetcher.current.last = dom;
+        context.last = dom;
+        this.updateTotalPage(context);
         return Array.from(dom.querySelectorAll('.WB_feed_type[mid]'));
       })());
     }
   }
 
-  request.ProfileFeedListFetcher = ProfileFeedListFetcher;
+  request.ProfileFeedFetcher = ProfileFeedFetcher;
+
+  class ProfileFeedDeleter extends ProfileFeedFetcher {
+    constructor(conf, context) {
+      super({ ...conf, isDelete: true }, context);
+    }
+  }
+
+  request.ProfileFeedDeleter = ProfileFeedDeleter;
+
+
+  /**
+   * @typedef {Object} CommentOutboxContext
+   * @property {HTMLElement} items
+   */
+
+  /**
+   * @extends {ListFetcher<HTMLElement>}
+   */
+  class CommentOutboxFetcher extends ListFetcher {
+    constructor(conf, context) {
+      super({ pageDelay: 1000, itemDelay: 1000, ...conf }, context);
+      this.pids = this.context.url.searchParams.get('pids');
+      this.domParser = new DOMParser();
+    }
+    /** @param {Context & CommentOutboxContext} context */
+    initialPage(context) {
+      const dom = context.dom;
+      for (let model of parse.models(dom)) {
+        try {
+          if (!model || !model.html) continue;
+          const dom = this.domParser.parseFromString(model.html, 'text/html');
+          const list = dom.querySelector('[node-type="comment_lists"]');
+          if (!list) continue;
+          const items = list.querySelectorAll('.WB_feed_type[comment_id]');
+          context.items = items;
+          if (this.isDelete) {
+            const pages = list.querySelectorAll('a.page[href]');
+            const lastPage = Math.max(...[...pages].map(page => Number(new URL(page.href).searchParams.get('page'))));
+            this.setTotal(lastPage);
+          }
+          break;
+        } catch (e) { /* ignore */ }
+      }
+    }
+    /** @param {Context & CommentOutboxContext} context */
+    getItemsOnPage(context) {
+      return context.items;
+    }
+  }
+
+  class CommentOutboxDeleter extends CommentOutboxFetcher {
+    constructor(conf, context) {
+      super({ ...conf, isDelete: true }, context);
+    }
+  }
+
+  request.CommentOutboxDeleter = CommentOutboxDeleter;
 
 }());

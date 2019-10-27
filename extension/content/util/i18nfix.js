@@ -7,7 +7,7 @@
 
   Object.assign(i18n, {
     configDialogTitle: {
-      cn: '设置 - 小工具',
+      cn: '设置 - 微博冰糕 (WBG)',
     },
     installSuccessTitle: { cn: '微博冰糕 (WBG) 安装成功', tw: '微博冰糕 (WBG) 安裝成功', en: 'Weibo Batch Genius Installation successed' },
     installSuccessText: {

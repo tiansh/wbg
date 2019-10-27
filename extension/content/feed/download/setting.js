@@ -125,7 +125,7 @@
     template: () => i18n.downloadOnFeedMenu,
     ainit() {
       observer.feed.add(function (feed) {
-        const [author, mid] = downloader.FeedDownloader.getFeedInfo(feed) || [];
+        const { author, mid } = downloader.FeedDownloader.getFeedInfo(feed) || [];
         if (!author || !mid) return;
         const menu = feed.querySelector('[node-type="fl_menu_right"] ul:not([node-type="hide"])');
         if (!menu) return;
@@ -153,7 +153,7 @@
       contextmenu.addListener(function (/** @type {MouseEvent} */event) {
         const feed = event.target.closest('[mid]');
         if (!feed) return [];
-        const [author, mid] = downloader.FeedDownloader.getFeedInfo(feed) || [];
+        const { author, mid } = downloader.FeedDownloader.getFeedInfo(feed) || [];
         if (!author || !mid) return [];
         return [{
           title: i18n.downloadFeed,
@@ -229,8 +229,7 @@
     parent: range.range,
     initial: true,
     template: () => i18n.batchFeedRangePage,
-    disabled: true,
-    feedDownload: true,
+    view: 'feedDownload',
     always: true,
     ref: {
       first: {

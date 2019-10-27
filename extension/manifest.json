@@ -3,7 +3,7 @@
   "manifest_version": 2,
   "name": "__MSG_extensionName__",
   "description": "__MSG_extensionDescription__",
-  "version": "0.2.7",
+  "version": "0.3.8",
   "default_locale": "zh_CN",
 
   "icons": {
@@ -57,17 +57,17 @@
         "yaofang/content/util/keyboard.js",
         "yaofang/content/util/ui.js",
         "yaofang/content/util/dom.js",
+        "yaofang/content/util/time.js",
         "content/util/mid.js",
         "content/util/timestamp.js",
         "content/util/parse.js",
 
         "yaofang/common/network/network.js",
         "yaofang/content/request/longfeed.js",
-        "content/request/progress.js",
         "content/request/list.js",
-        "content/request/delete.js",
         "content/request/feed.js",
         "content/request/deletecomment.js",
+        "content/request/deletefeed.js",
 
         "yaofang/content/storage/storage.js",
         "yaofang/content/storage/config.js",
@@ -92,6 +92,9 @@
         "content/feed/download/download.js",
         "content/feed/download/batch.js",
         "content/feed/download/setting.js",
+
+        "content/feed/delete/batch.js",
+        "content/feed/delete/setting.js",
 
         "content/comment/delete/batch.js",
         "content/comment/delete/setting.js",

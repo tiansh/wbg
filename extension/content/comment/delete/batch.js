@@ -35,17 +35,17 @@
   });
 
   const deleteComments = async function ({ url, first }) {
-    const deleter = new request.CommentOutboxDeleter({ url, start: first });
+    const fetcher = new request.CommentOutboxDeleter({ first }, { url: new URL(url) });
     const progressDialog = batch.progress.start({
       dialog: {
         title: i18n.commentDeleteOutboxDialogTitle,
         header: i18n.commentDeleteProgressDialogHeader,
       },
-      deleter,
+      fetcher,
     });
-    await deleter.delete(async comment => {
+    await fetcher.consume(async comment => {
       const id = comment.getAttribute('comment_id');
-      const success = await request.deleteComment(id, deleter.page);
+      const success = await request.deleteComment(id, fetcher.page);
       util.debug('Batch delete comment: %o [%s]', id, success ? 'success' : 'FAIL');
       return success;
     });
@@ -71,8 +71,7 @@
 `;
 
         const ruleItems = rule.query({
-          includeDisabled: true,
-          filter: item => item.commentDelete === true,
+          filter: item => item.view === 'commentDelete',
         });
         const header = inner.querySelector('.wbg-comment-delete-header');
         header.textContent = i18n.commentDeleteOutboxDialogHeader
