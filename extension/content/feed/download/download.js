@@ -107,12 +107,16 @@
      */
     async downloadFromBlob(blob, dest) {
       const filename = this.computeFilePath(dest);
-      return new Promise(resolve => {
+      return new Promise((resolve, reject) => {
         const fileReader = new FileReader();
         fileReader.addEventListener('load', async () => {
-          const url = fileReader.result;
-          await this.downloadFile({ url, filename });
-          resolve(filename);
+          try {
+            const url = fileReader.result;
+            await this.downloadFile({ url, filename });
+            resolve(filename);
+          } catch (e) {
+            reject(e);
+          }
         });
         fileReader.readAsDataURL(blob);
       });
@@ -175,13 +179,14 @@
       /** @type {{ raw: ArrayBuffer, page: Document }} */
       const feed = await request.getFeed(author, mid);
       this.fileDownloader.setPathParamResolver(new FilePathParamResolver(feed));
-      const content = config.content, empty = Promise.resolve();
-      await Promise.all([
+      const content = config.content, empty = Promise.resolve(true);
+      const successList = await Promise.all([
         content.text ? this.downloadAsText(feed) : empty,
         content.html ? this.downloadAsHtml(feed) : empty,
         content.image ? this.downloadImage(feed) : empty,
         content.video ? this.downloadVideo(feed) : empty,
       ]);
+      return successList.every(success => success);
     }
 
     /** @param {HTMLElement} feed */
@@ -189,37 +194,41 @@
       const text = feedParser.text.detail(feed);
       const content = '\ufeff' + text.replace(/\r|\n|\r\n|(\u2028)/g, '\r\n$1');
       const blob = new Blob([content], { type: 'application/octet-stream' });
-      await this.fileDownloader.downloadFromBlob(blob, './$mid.txt');
+      const success = await this.fileDownloader.downloadFromBlob(blob, './$mid.txt');
+      return success;
     }
 
     /** @param {HTMLElement} feed */
     async downloadAsHtml(feed) {
       const content = feed.outerHTML;
       const blob = new Blob([content], { type: 'application/octet-stream' });
-      await this.fileDownloader.downloadFromBlob(blob, './$mid.html');
+      const success = await this.fileDownloader.downloadFromBlob(blob, './$mid.html');
+      return success;
     }
 
     /** @param {HTMLElement} feed */
     async downloadImage(feed) {
       const imgs = Array.from(feed.querySelectorAll('.WB_media_wrap .WB_pic img'));
-      if (!imgs) return;
-      await Promise.all(imgs.map(async img => {
+      if (!imgs) return true;
+      const successList = await Promise.all(imgs.map(async img => {
         const host = new URL(img.src).host;
         const filename = img.src.split('/').pop();
         const url = `https://${host}/large/${filename}`;
         await this.fileDownloader.downloadFromUrl(url, `./$mid/${filename}`);
       }));
+      return successList.every(success => success);
     }
 
     /** @param {HTMLElement} feed */
     async downloadVideo(feed) {
       const container = feed.querySelector('li.WB_video[node-type="fl_h5_video"][video-sources]');
-      if (!container) return;
+      if (!container) return true;
       const videoSourceData = new URLSearchParams(container.getAttribute('video-sources'));
       const videoSource = videoSourceData.get(videoSourceData.get('qType'));
       const url = videoSource.replace(/^http:/, 'https:');
       const filename = new URL(url).pathname.split('/').pop();
-      await this.fileDownloader.downloadFromUrl(url, `./$mid/${filename}`);
+      const success = this.fileDownloader.downloadFromUrl(url, `./$mid/${filename}`);
+      return success;
     }
 
     static getFeedInfo(feed) {

@@ -58,7 +58,7 @@
         "yaofang/content/util/ui.js",
         "yaofang/content/util/dom.js",
         "yaofang/content/util/time.js",
-        "content/util/mid.js",
+        "yaofang/content/util/mid.js",
         "content/util/timestamp.js",
         "content/util/parse.js",
 
@@ -81,6 +81,7 @@
         "yaofang/content/backend/contextmenu.js",
 
         "yaofang/content/ruleset/rule.js",
+        "content/ruleset/rule.js",
         "yaofang/content/ruleset/observer.js",
         "content/ruleset/feed.js",
         "yaofang/content/ruleset/dialog.js",
@@ -95,6 +96,8 @@
 
         "content/feed/delete/batch.js",
         "content/feed/delete/setting.js",
+
+        "content/feed/filter.js",
 
         "content/comment/delete/batch.js",
         "content/comment/delete/setting.js",

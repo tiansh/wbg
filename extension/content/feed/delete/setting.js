@@ -73,7 +73,7 @@
 
   Object.assign(i18n, {
     batchFeedDeleteRangePage: {
-      cn: '删除从第{{first}}页起的所有微博',
+      cn: '删除从第{{first}}页起的所有符合条件的微博',
     },
   });
 

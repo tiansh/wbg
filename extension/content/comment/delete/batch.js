@@ -35,7 +35,8 @@
   });
 
   const deleteComments = async function ({ url, first }) {
-    const fetcher = new request.CommentOutboxDeleter({ first }, { url: new URL(url) });
+    const filter = rule.FilterRuleCollection(['commentDelete']).filter;
+    const fetcher = new request.CommentOutboxDeleter({ first, filter }, { url: new URL(url) });
     const progressDialog = batch.progress.start({
       dialog: {
         title: i18n.commentDeleteOutboxDialogTitle,
@@ -71,7 +72,7 @@
 `;
 
         const ruleItems = rule.query({
-          filter: item => item.view === 'commentDelete',
+          filter: item => ['commentDelete'].includes(item.view),
         });
         const header = inner.querySelector('.wbg-comment-delete-header');
         header.textContent = i18n.commentDeleteOutboxDialogHeader

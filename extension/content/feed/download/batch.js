@@ -35,7 +35,8 @@
   });
 
   const startDownload = async function ({ url, first, last }) {
-    const fetcher = new request.ProfileFeedFetcher({ first, last }, { url: new URL(url) });
+    const filter = rule.FilterRuleCollection(['feedDownload', 'feedFilter']).filter;
+    const fetcher = new request.ProfileFeedFetcher({ first, last, filter }, { url: new URL(url) });
     const progressDialog = batch.progress.start({
       dialog: {
         title: i18n.feedDownloadDialogTitle,
@@ -52,8 +53,8 @@
       const { author, mid } = downloader.FeedDownloader.getFeedInfo(feed);
       const oid = fetcher.getConfig().oid;
       if (author !== oid) return null;
-      await feedDownloader.download(author, mid);
-      return true;
+      const success = await feedDownloader.download(author, mid);
+      return success;
     });
     progressDialog.hide();
     ui.alert({
@@ -76,7 +77,7 @@
 <div class="wbg-feed-download-body"></div>
 `;
         const ruleItems = rule.query({
-          filter: item => item.view === 'feedDownload',
+          filter: item => ['feedDownload', 'feedFilter'].includes(item.view),
         });
         const header = inner.querySelector('.wbg-feed-download-header');
         header.textContent = i18n.feedDownloadDialogHeader

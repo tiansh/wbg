@@ -44,13 +44,18 @@
    */
   const downloadFile = async function downloadFile({ url, filename }) {
     const sender = this;
-    if (url.startsWith('data:')) {
-      const blob = await fetch(url, { credentials: 'omit' }).then(resp => resp.blob());
-      const blobUrl = URL.createObjectURL(blob);
-      await downloadByUrl({ url: blobUrl, filename });
-      URL.revokeObjectURL(blobUrl);
-    } else {
-      await downloadByUrl({ url, filename, tab: sender.tab });
+    try {
+      if (url.startsWith('data:')) {
+        const blob = await fetch(url, { credentials: 'omit' }).then(resp => resp.blob());
+        const blobUrl = URL.createObjectURL(blob);
+        await downloadByUrl({ url: blobUrl, filename });
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        await downloadByUrl({ url, filename, tab: sender.tab });
+      }
+      return true;
+    } catch (e) {
+      return false;
     }
   };
   message.export(downloadFile);

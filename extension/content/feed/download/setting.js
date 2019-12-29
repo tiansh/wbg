@@ -219,7 +219,7 @@
 
   Object.assign(i18n, {
     batchFeedRangePage: {
-      cn: '下载从第{{first}}页到第{{last}}页的微博',
+      cn: '下载从第{{first}}页到第{{last}}页符合条件的微博',
     },
   });
 
@@ -249,5 +249,5 @@
     },
   });
 
-
 }());
+

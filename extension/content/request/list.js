@@ -96,9 +96,10 @@
      * @param {number?} config.pageDelay
      * @param {number?} config.itemDelay
      * @param {boolean} config.isDelete
+     * @param {((item: ListItem) => boolean)?} config.filter
      * @param {Context} context
      */
-    constructor({ first, last = null, pageDelay, itemDelay, isDelete = false }, context) {
+    constructor({ first, last = null, pageDelay, itemDelay, isDelete = false, filter }, context) {
       // 如果是删除用，那么随着删除，页码会跟着变化
       // 所以没办法根据截止的页码来控制删除
       if (isDelete && last !== null) {
@@ -121,6 +122,8 @@
       this.consumed = false;
       this.pageProgress = new Progresser(this.last);
       this.itemProgress = new Progresser();
+
+      this.filter = filter;
     }
     /** @param {number} total */
     setTotal(total) {
@@ -168,8 +171,11 @@
         }
         const results = [];
         for await (const item of this.getPageItems(this.context, this.page)) {
-          results.push(await callback(item));
-          await this.delay(this.itemDelay);
+          const success = await callback(item);
+          results.push(success);
+          if (success !== null) {
+            await this.delay(this.itemDelay);
+          }
         }
         this.nextPage(this.isDelete && results.some(s => s));
       }
@@ -258,6 +264,7 @@
       if (this.consumed) return;
       await this.fetch(item => {
         try {
+          if (!this.filter(item)) return null;
           return consumer(item);
         } catch (e) {
           util.debug('Error while consume item (%o):\n%o', item, e);

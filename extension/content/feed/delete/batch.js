@@ -35,7 +35,8 @@
   });
 
   const deleteFeeds = async function ({ url, first }) {
-    const fetcher = new request.ProfileFeedDeleter({ first }, { url: new URL(url) });
+    const filter = rule.FilterRuleCollection(['feedDelete', 'feedFilter']).filter;
+    const fetcher = new request.ProfileFeedDeleter({ first, filter }, { url: new URL(url) });
     const progressDialog = batch.progress.start({
       dialog: {
         title: i18n.feedDeleteDialogTitle,
@@ -71,7 +72,7 @@
 `;
 
         const ruleItems = rule.query({
-          filter: item => item.view === 'feedDelete',
+          filter: item => ['feedDelete', 'feedFilter'].includes(item.view),
         });
         const header = inner.querySelector('.wbg-feed-delete-header');
         header.textContent = i18n.feedDeleteDialogHeader
