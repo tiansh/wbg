@@ -74,6 +74,45 @@
 
   request.Progresser = Progresser;
 
+  class Log {
+    constructor() {
+      this.logs = new WeakMap();
+      this.callbacks = [];
+      this.container = null;
+    }
+    render(container) {
+      this.container = container;
+    }
+    start(item) {
+      this.updateStatus(item, 'processing', { startTime: new Date() });
+    }
+    finish(item, success) {
+      const status = success === null ? 'skip' : success ? 'success' : 'fail';
+      this.updateStatus(item, status, { endTime: new Date() });
+    }
+    started(item) {
+      return this.logs.has(item);
+    }
+    updateStatus(item, status, detail) {
+      if (!this.logs.has(item)) {
+        this.logs.set(item, {});
+      }
+      const log = this.logs.get(item);
+      const oldStatus = log.oldStatus;
+      Object.assign(log, detail, { status });
+      this.callbacks.forEach(callback => {
+        try {
+          callback(item, status, oldStatus, log);
+        } catch (e) {
+          util.debug('Error while update log status: %o', e);
+        }
+      });
+    }
+    onUpdateStatus(callback) {
+      this.callbacks.push(callback);
+    }
+  }
+
   /**
    * @typedef {Object} Context
    * @property {URL} url
@@ -122,6 +161,7 @@
       this.consumed = false;
       this.pageProgress = new Progresser(this.last);
       this.itemProgress = new Progresser();
+      this.log = new Log();
 
       this.filter = filter;
     }
@@ -261,22 +301,41 @@
      * @param {(item: ListItem) => boolean} consumer
      */
     async consume(consumer) {
+      this.consumer = consumer;
       if (this.consumed) return;
-      await this.fetch(item => {
+      this.consumed = true;
+      await this.fetch(async item => {
+        let success = null;
         try {
-          if (!this.filter(item)) return null;
-          return consumer(item);
+          this.log.start(item);
+          if (this.filter(item)) {
+            success = await consumer(item);
+          }
         } catch (e) {
           util.debug('Error while consume item (%o):\n%o', item, e);
-          return false;
+          success = false;
         }
+        this.log.finish(item, success);
+        return success;
       });
+    }
+    async retry(item) {
+      if (!this.consumed) return false;
+      if (!this.log.started(item)) return false;
+      const consumer = this.consumer;
+      this.log.start(item);
+      const success = await consumer(item);
+      this.log.finish(item, success);
+      return success;
     }
     getProgres() {
       return { page: this.pageProgress, item: this.itemProgress };
     }
     getConfig() {
       return this.context.config;
+    }
+    getLog() {
+      return this.log;
     }
   }
 

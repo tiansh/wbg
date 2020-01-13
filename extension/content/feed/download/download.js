@@ -5,6 +5,7 @@
   const feedParser = yawf.feed;
   const request = yawf.request;
   const message = yawf.message;
+  const util = yawf.util;
 
   const downloader = yawf.downloader = {};
 
@@ -19,6 +20,9 @@
         video: content.downloadVideo.getConfig(),
       },
       path: './wbg/$year$month/$author/',
+      timeout: 30000,
+      retry: 3,
+      retryDelay: 5000,
     };
   };
 
@@ -76,8 +80,26 @@
       return this.normalizeFilename(paramPath);
     }
     async downloadFile({ url, filename }) {
+      const download = new Promise(async resolve => {
+        try {
+          for (let times = 0; times < 3; times++) {
+            const success = await message.invoke.downloadFile({ url, filename });
+            if (success) {
+              resolve(true);
+              return;
+            }
+          }
+        } catch (e) {
+          // fail
+        }
+        resolve(false);
+      });
       await Promise.race([
-        message.invoke.downloadFile({ url, filename }),
+        download.then(success => {
+          if (success) return;
+          util.debug('Download error: %o', url);
+          throw new Error('Download Fail');
+        }),
         new Promise((resolve, reject) => {
           setTimeout(() => reject(Error('Timeout')), this.timeout);
         }),
@@ -174,7 +196,22 @@
       const config = this.config = mergeSetting(getSetting(), custom);
       this.fileDownloader = new FileDownloader(config.path);
     }
+
     async download(author, mid) {
+      const config = this.config;
+      const timeout = config.timeout;
+      for (let times = 1; ; times++) {
+        const success = await Promise.race([
+          this.downloadFeedOnce(author, mid),
+          new Promise(resolve => setTimeout(() => resolve(false), timeout)),
+        ]);
+        if (success) return true;
+        if (times === config.retry) return false;
+        await new Promise(resolve => setTimeout(resolve, config.retryDelay));
+      }
+    }
+
+    async downloadFeedOnce(author, mid) {
       const config = this.config;
       /** @type {{ raw: ArrayBuffer, page: Document }} */
       const feed = await request.getFeed(author, mid);
@@ -185,7 +222,8 @@
         content.html ? this.downloadAsHtml(feed) : empty,
         content.image ? this.downloadImage(feed) : empty,
         content.video ? this.downloadVideo(feed) : empty,
-      ]);
+      ].map(promise => promise.then(() => true, () => false)));
+      util.debug('download %o success: %o', mid, successList);
       return successList.every(success => success);
     }
 
@@ -194,41 +232,49 @@
       const text = feedParser.text.detail(feed);
       const content = '\ufeff' + text.replace(/\r|\n|\r\n|(\u2028)/g, '\r\n$1');
       const blob = new Blob([content], { type: 'application/octet-stream' });
-      const success = await this.fileDownloader.downloadFromBlob(blob, './$mid.txt');
-      return success;
+      await this.fileDownloader.downloadFromBlob(blob, './$mid.txt');
     }
 
     /** @param {HTMLElement} feed */
     async downloadAsHtml(feed) {
       const content = feed.outerHTML;
       const blob = new Blob([content], { type: 'application/octet-stream' });
-      const success = await this.fileDownloader.downloadFromBlob(blob, './$mid.html');
-      return success;
+      await this.fileDownloader.downloadFromBlob(blob, './$mid.html');
     }
 
     /** @param {HTMLElement} feed */
     async downloadImage(feed) {
       const imgs = Array.from(feed.querySelectorAll('.WB_media_wrap .WB_pic img'));
-      if (!imgs) return true;
+      if (!imgs) return;
       const successList = await Promise.all(imgs.map(async img => {
         const host = new URL(img.src).host;
         const filename = img.src.split('/').pop();
         const url = `https://${host}/large/${filename}`;
         await this.fileDownloader.downloadFromUrl(url, `./$mid/${filename}`);
-      }));
-      return successList.every(success => success);
+      }).map(promise => promise.then(() => true, () => false)));
+      if (!successList.every(success => success)) {
+        throw new Error('Image download fail.');
+      }
     }
 
     /** @param {HTMLElement} feed */
     async downloadVideo(feed) {
       const container = feed.querySelector('li.WB_video[node-type="fl_h5_video"][video-sources]');
-      if (!container) return true;
+      if (!container) return;
       const videoSourceData = new URLSearchParams(container.getAttribute('video-sources'));
-      const videoSource = videoSourceData.get(videoSourceData.get('qType'));
+      let videoSource = videoSourceData.get(videoSourceData.get('qType'));
+      if (!videoSource) {
+        videoSource = Array.from(videoSourceData)
+          .filter(([key, value]) => /^https?(?::|%3A)/i.test(value))
+          .reduce((s1, s2) => +s1[0] > +s2[0] ? s1 : s2)[1];
+      }
+      if (/^https?%3A/i.test(videoSource)) {
+        videoSource = decodeURIComponent(videoSource);
+      }
+      videoSource = videoSource.replace(/^http:/, 'https:');
       const url = videoSource.replace(/^http:/, 'https:');
       const filename = new URL(url).pathname.split('/').pop();
-      const success = this.fileDownloader.downloadFromUrl(url, `./$mid/${filename}`);
-      return success;
+      this.fileDownloader.downloadFromUrl(url, `./$mid/${filename}`);
     }
 
     static getFeedInfo(feed) {

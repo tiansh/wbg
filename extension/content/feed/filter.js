@@ -39,9 +39,8 @@
 
   filter.filterOriginal = rule.FilterRule({
     id: 'feed_filter_by_original',
-    version: 15,
+    version: 10,
     parent: filter.filter,
-    initial: true,
     template: () => i18n.feedFilterByOriginal,
     ref: {
       original: { type: 'boolean', initial: true },
@@ -69,9 +68,8 @@
 
   filter.filterMedia = rule.FilterRule({
     id: 'feed_filter_by_media',
-    version: 15,
+    version: 10,
     parent: filter.filter,
-    initial: true,
     template: () => i18n.feedFilterByMedia,
     ref: {
       nomedia: { type: 'boolean', initial: true },
@@ -101,9 +99,8 @@
 
   filter.filterContent = rule.FilterRule({
     id: 'feed_filter_by_content',
-    version: 15,
+    version: 10,
     parent: filter.filter,
-    initial: true,
     template: () => i18n.feedFilterByContent,
     ref: {
       regexen: { type: 'regexen' },
@@ -116,6 +113,49 @@
       const text = feedParser.text.detail(feed);
       const matchReg = regexen.find(regex => regex.test(text));
       return Boolean(matchReg);
+    },
+  });
+
+  Object.assign(i18n, {
+    feedFilterByDate: {
+      cn: '按发布时间筛选|从{{start}}到{{end}}',
+    },
+  });
+
+  const dateString = function (date) {
+    return new Date(Number(date) + 288e5).toISOString().split('T')[0];
+  };
+  const today = dateString(new Date());
+
+  filter.filterDate = rule.FilterRule({
+    id: 'feed_filter_by_date',
+    version: 11,
+    parent: filter.filter,
+    template: () => i18n.feedFilterByDate,
+    ref: {
+      start: {
+        type: 'date',
+        min: '2009-08-16',
+        max: today,
+        initial: '2009-08-16',
+      },
+      end: {
+        type: 'date',
+        min: '2009-08-16',
+        max: today,
+        initial: today,
+      },
+    },
+    view: 'feedFilter',
+    filter(feed) {
+      if (!this.isEnabled()) return true;
+      const start = this.ref.start.getConfig();
+      const end = this.ref.end.getConfig();
+      const date = feedParser.date.date(feed);
+      const dateStr = new Date(+date + 288e5).toISOString().split('T')[0];
+      if (dateStr <= end && dateStr >= start) return true;
+      if (dateStr >= end && dateStr <= start) return true;
+      return false;
     },
   });
 

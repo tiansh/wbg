@@ -4,9 +4,6 @@
   const util = yawf.util;
   const request = yawf.request = yawf.request || {};
 
-  const dom = util.dom;
-  const parse = util.parse;
-
   let lastTimestamp = null;
   // 获取单条微博
   const deleteComment = async function (commentId, page = 1) {

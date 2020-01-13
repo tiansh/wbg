@@ -9,17 +9,15 @@
       filename,
       conflictAction: 'overwrite',
     });
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
       const downloadFinish = async function (error) {
         browser.downloads.onChanged.removeListener(downloadOnChanged);
-        if (error) {
-          reject(error);
-        }
+        if (error) resolve(false);
         try {
           await browser.downloads.erase({ id: downloadId });
-          resolve();
+          resolve(true);
         } catch (e) {
-          reject(e);
+          resolve(false);
         }
       };
       const stateUpdate = function (state) {
@@ -48,12 +46,13 @@
       if (url.startsWith('data:')) {
         const blob = await fetch(url, { credentials: 'omit' }).then(resp => resp.blob());
         const blobUrl = URL.createObjectURL(blob);
-        await downloadByUrl({ url: blobUrl, filename });
+        const success = await downloadByUrl({ url: blobUrl, filename });
         URL.revokeObjectURL(blobUrl);
+        return success;
       } else {
-        await downloadByUrl({ url, filename, tab: sender.tab });
+        const success = await downloadByUrl({ url, filename, tab: sender.tab });
+        return success;
       }
-      return true;
     } catch (e) {
       return false;
     }
@@ -64,9 +63,11 @@
    * @param {{ url: string, filename: string }[]}
    */
   const downloadFiles = async function downloadFiles(files) {
+    let success = true;
     for (let i = 0, l = files.length; i < l; i++) {
-      await downloadFile(files[i]);
+      success = await downloadFile(files[i]) && success;
     }
+    return success;
   };
   message.export(downloadFiles);
 

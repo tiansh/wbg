@@ -6,16 +6,16 @@
   const rules = yawf.rules;
   const request = yawf.request;
   const downloader = yawf.downloader;
+  const feedParser = yawf.feed;
 
   const ui = util.ui;
   const i18n = util.i18n;
   const css = util.css;
   const timestamp = util.timestamp;
+  const mid = util.mid;
 
   const wbg = window.wbg;
   const batch = wbg.batch;
-
-  const progress = batch.progress;
 
   const feedDownload = batch.feedDownload = {};
 
@@ -32,7 +32,27 @@
     feedDownloadFinish: {
       cn: '选定的下载已完成，请到浏览器的下载目录查看',
     },
+    feedDownloadLogItem: {
+      cn: '下载微博 {}',
+    },
   });
+
+  const logRender = function (feed) {
+    const id = feedParser.mid(feed);
+    const author = feedParser.author.id(feed);
+    const host = location.hostname === 'www.weibo.com' ? 'www.weibo.com' : 'weibo.com';
+    const url = `https://${host}/${author}/${mid.encode(id)}`;
+    const container = document.createElement('span');
+    const link = document.createElement('a');
+    link.href = url;
+    link.textContent = id;
+    link.target = '_blank';
+    i18n.feedDownloadLogItem.split(/({})/).forEach(text => {
+      if (text === '{}') container.appendChild(link);
+      else container.appendChild(document.createTextNode(text));
+    });
+    return container;
+  };
 
   const startDownload = async function ({ url, first, last }) {
     const filter = rule.FilterRuleCollection(['feedDownload', 'feedFilter']).filter;
@@ -45,6 +65,7 @@
           .replace('{last}', () => last),
       },
       fetcher,
+      render: { log: logRender },
     });
     const feedDownloader = new downloader.FeedDownloader({
       path: `./wbg/feed/batch-${timestamp.getDateTime()}/$author/$year$month/`,
@@ -56,7 +77,7 @@
       const success = await feedDownloader.download(author, mid);
       return success;
     });
-    progressDialog.hide();
+    progressDialog.finish();
     ui.alert({
       id: 'wbg-feed-download-success',
       icon: 'succ',

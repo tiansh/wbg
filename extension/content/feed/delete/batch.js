@@ -5,17 +5,15 @@
   const rule = yawf.rule;
   const rules = yawf.rules;
   const request = yawf.request;
-  const downloader = yawf.downloader;
+  const feedParser = yawf.feed;
 
   const ui = util.ui;
   const i18n = util.i18n;
   const css = util.css;
-  const timestamp = util.timestamp;
 
   const wbg = window.wbg;
   const batch = wbg.batch;
 
-  const progress = batch.progress;
 
   const feedDelete = batch.feedDelete = {};
 
@@ -27,12 +25,25 @@
       cn: '您发出的微博共 {total} 页，您当前正在查看第 {current} 页',
     },
     feedDeleteProgressDialogHeader: {
-      cn: '正在删除自己发出的微博，请勿关闭该标签页',
+      cn: '正在删除自己发出的微博，请勿关闭该标签页。删除期间请勿发布新微博。',
     },
     feedDeleteFinish: {
       cn: '已删除您发出的微博',
     },
+    feedDeleteLogItem: {
+      cn: '删除微博 {}',
+    },
   });
+
+  const logRender = function (feed) {
+    const id = feedParser.mid(feed);
+    const container = document.createElement('span');
+    i18n.feedDeleteLogItem.split(/({})/).forEach(text => {
+      if (text === '{}') container.appendChild(document.createTextNode(id));
+      else container.appendChild(document.createTextNode(text));
+    });
+    return container;
+  };
 
   const deleteFeeds = async function ({ url, first }) {
     const filter = rule.FilterRuleCollection(['feedDelete', 'feedFilter']).filter;
@@ -43,6 +54,8 @@
         header: i18n.feedDeleteProgressDialogHeader,
       },
       fetcher,
+      render: { log: logRender },
+      isDelete: true,
     });
     await fetcher.consume(async feed => {
       const mid = feed.getAttribute('mid');
@@ -50,14 +63,13 @@
       util.debug('Batch delete feed: %o [%s]', mid, success ? 'success' : 'FAIL');
       return success;
     });
-    progressDialog.hide();
+    progressDialog.finish();
     await ui.alert({
       id: 'wbg-feed-delete-success',
       icon: 'succ',
       title: i18n.feedDeleteDialogTitle,
       text: i18n.feedDeleteFinish,
     });
-    location.reload();
   };
 
   feedDelete.showDialog = function ({ url, current, total }) {

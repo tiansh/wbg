@@ -7,6 +7,43 @@
 
   const css = util.css;
 
+  /**
+   * 一个日期框
+   * 允许定义 min, max 属性
+   * 对应一个 date 输入框
+   */
+  class DateConfigItem extends rule.class.InputConfigItem {
+    constructor(item, parent) {
+      super(item, parent);
+    }
+    get inputType() { return 'date'; }
+    get initial() {
+      const today = new Date(Date.now() + 288e5).toISOString().split('T')[0];
+      const notmin = this.min && this.min > today ? this.min : today;
+      const notmax = this.max && this.max < notmin ? this.max : notmin;
+      return notmax;
+    }
+    get min() { return ''; }
+    get max() { return ''; }
+    normalize(value) {
+      if (!/\d{4}-\d\d-\d\d/.test(value)) return this.initial;
+      let date = value;
+      if (+this.min === this.min && date < this.min) date = this.min;
+      if (+this.max === this.max && date > this.max) date = this.max;
+      return date;
+    }
+    render() {
+      const container = super.render();
+      const input = container.querySelector('input');
+      if (this.min) input.min = this.min;
+      if (this.max) input.max = this.max;
+      return container;
+    }
+  }
+  rule.class.DateConfigItem = DateConfigItem;
+  rule.types.date = DateConfigItem;
+
+
   class FilterRule extends rule.class.Rule {
     constructor(item) {
       super(item);

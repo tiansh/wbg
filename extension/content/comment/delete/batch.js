@@ -27,12 +27,25 @@
       cn: '您发出的评论共 {total} 页，您当前正在查看第 {current} 页',
     },
     commentDeleteProgressDialogHeader: {
-      cn: '正在删除自己发出的评论，请勿关闭该标签页',
+      cn: '正在删除自己发出的评论，请勿关闭该标签页。删除过程中请勿发布新评论。',
     },
     commentDeleteOutboxFinish: {
       cn: '已删除您发出的评论',
     },
+    commentDeleteOutboxLogItem: {
+      cn: '删除评论 {}',
+    },
   });
+
+  const logRender = function (comment) {
+    const id = comment.getAttribute('comment_id');
+    const container = document.createElement('span');
+    i18n.commentDeleteOutboxLogItem.split(/({})/).forEach(text => {
+      if (text === '{}') container.appendChild(document.createTextNode(id));
+      else container.appendChild(document.createTextNode(text));
+    });
+    return container;
+  };
 
   const deleteComments = async function ({ url, first }) {
     const filter = rule.FilterRuleCollection(['commentDelete']).filter;
@@ -43,6 +56,8 @@
         header: i18n.commentDeleteProgressDialogHeader,
       },
       fetcher,
+      render: { log: logRender },
+      isDelete: true,
     });
     await fetcher.consume(async comment => {
       const id = comment.getAttribute('comment_id');
@@ -50,14 +65,13 @@
       util.debug('Batch delete comment: %o [%s]', id, success ? 'success' : 'FAIL');
       return success;
     });
-    progressDialog.hide();
+    progressDialog.finish();
     await ui.alert({
       id: 'wbg-comment-delete-success',
       icon: 'succ',
       title: i18n.commentDeleteOutboxDialogTitle,
       text: i18n.commentDeleteOutboxFinish,
     });
-    location.reload();
   };
 
   commentDeleteOutbox.showDialog = function ({ url, current, total }) {
