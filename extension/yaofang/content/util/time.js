@@ -51,7 +51,7 @@
       hour: '2-digit',
       minute: '2-digit',
       timeZoneName: 'long',
-    },
+    }
   );
 
   const now = time.now = function () {

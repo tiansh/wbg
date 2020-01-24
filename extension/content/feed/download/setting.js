@@ -205,6 +205,54 @@
     },
   });
 
+  i18n.batchFeedTimeoutGroupTitle = {
+    cn: '超时重试',
+  };
+
+  const timeout = feedDownload.timeout = {};
+  timeout.timeout = rule.Group({
+    parent: feedDownload.feedDownload,
+    template: () => i18n.batchFeedTimeoutGroupTitle,
+  });
+
+  Object.assign(i18n, {
+    feedDownloadTimeout: {
+      cn: '下载微博时一条微博经过{{timeout}}未完成则认为下载失败|{{i}}',
+    },
+    feedDownloadTimeout1min: { cn: '1 分钟' },
+    feedDownloadTimeout3min: { cn: '3 分钟' },
+    feedDownloadTimeout5min: { cn: '5 分钟' },
+    feedDownloadTimeout15min: { cn: '15 分钟' },
+    feedDownloadTimeout30min: { cn: '30 分钟' },
+    feedDownloadTimeout60min: { cn: '60 分钟' },
+    feedDownloadTimeoutDetail: {
+      cn: '请根据您的网络状况选择。如果您的网络状况较差或您是海外用户，您可以适当延长超时时间。',
+    },
+  });
+
+  timeout.feedDownloadTimeout = rule.Rule({
+    id: 'feed_download_timeout',
+    version: 12,
+    parent: timeout.timeout,
+    always: true,
+    template: () => i18n.feedDownloadTimeout,
+    ref: {
+      timeout: {
+        type: 'select',
+        select: [
+          { value: 1, text: () => i18n.feedDownloadTimeout1min },
+          { value: 3, text: () => i18n.feedDownloadTimeout3min },
+          { value: 5, text: () => i18n.feedDownloadTimeout5min },
+          { value: 15, text: () => i18n.feedDownloadTimeout15min },
+          { value: 30, text: () => i18n.feedDownloadTimeout30min },
+          { value: 60, text: () => i18n.feedDownloadTimeout60min },
+        ],
+        initial: 5,
+      },
+      i: { type: 'bubble', icon: 'ask', template: () => i18n.feedDownloadTimeoutDetail },
+    },
+  });
+
   i18n.batchFeedRangeGroupTitle = {
     cn: '下载范围',
   };

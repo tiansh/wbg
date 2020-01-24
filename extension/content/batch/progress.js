@@ -138,6 +138,8 @@
         close() {
           if (config.isDelete) {
             location.reload();
+          } else {
+            progressDialog.hide();
           }
         },
       },

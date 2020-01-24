@@ -20,7 +20,7 @@
   network.parseJson = function (resp) {
     return JSON.parse(resp
       .replace(/^(?:try\{[^{]*\()?\{/, '{')
-      .replace(/}(?:\)\s*;?\s*}catch\(e\)\{\};?)?$/, '}'),
+      .replace(/}(?:\)\s*;?\s*}catch\(e\)\{\};?)?$/, '}')
     );
   };
 

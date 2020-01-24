@@ -22,3 +22,4 @@
   request.deleteFeed = deleteFeed;
 
 }());
+

@@ -177,7 +177,16 @@
       this.processed++;
       this.page++;
       if (this.isDelete) {
-        if (repeat) this.page--;
+        if (this.peek) {
+          this.peek = 0;
+          this.page--;
+        } else if (repeat) {
+          // 如果开启了过滤条件，有可能只删除了少数内容其他内容都被跳过了
+          // 这时候如果反复这一页可能每次只删除一条，十分浪费时间
+          // 所以我们先把下一页的删一下，再回来删这一页，这样可以尽可能减少反复
+          if (!this.isDone()) this.peek = 1;
+          this.page--;
+        }
         this.pageProgress.setMax(this.total - this.page + this.processed + 1);
         this.pageProgress.setValue(this.processed);
       } else {
@@ -204,19 +213,23 @@
     async fetch(callback) {
       this.pageProgress.setValue(0);
       this.page = this.first;
+      if (this.isDelete) this.peek = 0;
       this.processed = 0;
       while (!this.isDone()) {
         if (this.processed) {
           await this.delay(this.pageDelay);
         }
         const results = [];
-        for await (const item of this.getPageItems(this.context, this.page)) {
+        const page = this.page + this.peek;
+        for await (const item of this.getPageItems(this.context, page)) {
           const success = await callback(item);
           results.push(success);
           if (success !== null) {
             await this.delay(this.itemDelay);
           }
         }
+        const count = val => results.filter(r => r === val).length;
+        util.debug('Page %o finished: %o success, %o fail, %o skip', page, count(true), count(false), count(null));
         this.nextPage(this.isDelete && results.some(s => s));
       }
     }
@@ -227,6 +240,7 @@
     async fetchPage(context, page) {
       const url = new URL(context.url);
       url.searchParams.set('page', page);
+      util.debug('Fetch page %o: %o', page, url.href);
       const html = await fetch(url.href, { credentials: 'same-origin' }).then(resp => resp.text());
       const dom = new DOMParser().parseFromString(html, 'text/html');
       context.html = html;
@@ -383,7 +397,9 @@
     getItemsOnPage(context) {
       const first = context.first;
       if (!first) return [];
-      return Array.from(first.querySelectorAll('.WB_feed_type[mid]'));
+      const feeds = Array.from(first.querySelectorAll('.WB_feed_type[mid]'));
+      feeds.forEach(feed => feed.parentNode.removeChild(feed));
+      return feeds;
     }
     /** @param {Context & ProfileContext} context */
     getLazyLoadItems(context) {
@@ -421,7 +437,9 @@
         const dom = fetcher.domParser.parseFromString(snippet, 'text/html');
         context.last = dom;
         this.updateTotalPage(context);
-        return Array.from(dom.querySelectorAll('.WB_feed_type[mid]'));
+        const feeds = Array.from(dom.querySelectorAll('.WB_feed_type[mid]'));
+        feeds.forEach(feed => feed.parentNode.removeChild(feed));
+        return feeds;
       })());
     }
   }
@@ -460,13 +478,14 @@
           const dom = this.domParser.parseFromString(model.html, 'text/html');
           const list = dom.querySelector('[node-type="comment_lists"]');
           if (!list) continue;
-          const items = list.querySelectorAll('.WB_feed_type[comment_id]');
+          const items = Array.from(list.querySelectorAll('.WB_feed_type[comment_id]'));
           context.items = items;
           if (this.isDelete) {
             const pages = list.querySelectorAll('a.page[href]');
             const lastPage = Math.max(...[...pages].map(page => Number(new URL(page.href).searchParams.get('page'))));
             this.setTotal(lastPage);
           }
+          items.forEach(item => item.parentNode.removeChild(item));
           break;
         } catch (e) { /* ignore */ }
       }

@@ -12,6 +12,7 @@
   const getSetting = function () {
     const setting = yawf.rules.feedDownload;
     const content = setting.content;
+    const timeout = setting.timeout;
     return {
       content: {
         html: content.downloadAsHtml.getConfig(),
@@ -20,7 +21,7 @@
         video: content.downloadVideo.getConfig(),
       },
       path: './wbg/$year$month/$author/',
-      timeout: 30000,
+      timeout: timeout.feedDownloadTimeout.ref.timeout.getConfig() * 6e4,
       retry: 3,
       retryDelay: 5000,
     };
@@ -82,17 +83,11 @@
     async downloadFile({ url, filename }) {
       const download = new Promise(async resolve => {
         try {
-          for (let times = 0; times < 3; times++) {
-            const success = await message.invoke.downloadFile({ url, filename });
-            if (success) {
-              resolve(true);
-              return;
-            }
-          }
+          const success = await message.invoke.downloadFile({ url, filename, timeout: this.timeout });
+          resolve(success);
         } catch (e) {
-          // fail
+          resolve(false);
         }
-        resolve(false);
       });
       await Promise.race([
         download.then(success => {
@@ -194,7 +189,7 @@
   class FeedDownloader {
     constructor(custom = {}) {
       const config = this.config = mergeSetting(getSetting(), custom);
-      this.fileDownloader = new FileDownloader(config.path);
+      this.fileDownloader = new FileDownloader(config.path, false, config.timeout);
     }
 
     async download(author, mid) {

@@ -3,7 +3,7 @@
   const yawf = window.yawf;
   const message = yawf.message;
 
-  const downloadByUrl = async function ({ url, filename, tab = null }) {
+  const downloadByUrl = async function ({ url, filename, tab = null, timeout }) {
     const downloadId = await browser.downloads.download({
       url,
       filename,
@@ -34,23 +34,27 @@
       downloadItemPromise.then(([downloadItem]) => {
         stateUpdate(downloadItem.state);
       }, error => downloadFinish(new Error(error)));
+      setTimeout(async function () {
+        await browser.downloads.cancel(downloadId).then(() => { }, () => { });
+        resolve(false);
+      }, timeout);
     });
   };
 
   /**
    * @param {{ url: string, filename: string }}
    */
-  const downloadFile = async function downloadFile({ url, filename }) {
+  const downloadFile = async function downloadFile({ url, filename, timeout = 3e5 }) {
     const sender = this;
     try {
       if (url.startsWith('data:')) {
         const blob = await fetch(url, { credentials: 'omit' }).then(resp => resp.blob());
         const blobUrl = URL.createObjectURL(blob);
-        const success = await downloadByUrl({ url: blobUrl, filename });
+        const success = await downloadByUrl({ url: blobUrl, filename, tab: sender.tab, timeout });
         URL.revokeObjectURL(blobUrl);
         return success;
       } else {
-        const success = await downloadByUrl({ url, filename, tab: sender.tab });
+        const success = await downloadByUrl({ url, filename, tab: sender.tab, timeout });
         return success;
       }
     } catch (e) {
@@ -58,18 +62,5 @@
     }
   };
   message.export(downloadFile);
-
-  /**
-   * @param {{ url: string, filename: string }[]}
-   */
-  const downloadFiles = async function downloadFiles(files) {
-    let success = true;
-    for (let i = 0, l = files.length; i < l; i++) {
-      success = await downloadFile(files[i]) && success;
-    }
-    return success;
-  };
-  message.export(downloadFiles);
-
 
 }());

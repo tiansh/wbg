@@ -39,7 +39,6 @@
 
   filter.filterOriginal = rule.FilterRule({
     id: 'feed_filter_by_original',
-    version: 10,
     parent: filter.filter,
     template: () => i18n.feedFilterByOriginal,
     ref: {
@@ -68,7 +67,6 @@
 
   filter.filterMedia = rule.FilterRule({
     id: 'feed_filter_by_media',
-    version: 10,
     parent: filter.filter,
     template: () => i18n.feedFilterByMedia,
     ref: {
@@ -99,7 +97,6 @@
 
   filter.filterContent = rule.FilterRule({
     id: 'feed_filter_by_content',
-    version: 10,
     parent: filter.filter,
     template: () => i18n.feedFilterByContent,
     ref: {
@@ -129,7 +126,6 @@
 
   filter.filterDate = rule.FilterRule({
     id: 'feed_filter_by_date',
-    version: 11,
     parent: filter.filter,
     template: () => i18n.feedFilterByDate,
     ref: {
