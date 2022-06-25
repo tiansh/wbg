@@ -1,17 +1,14 @@
 ; (function () {
 
-  const yawf = window.yawf = window.yawf || {};
+  const yawf = window.yawf = window.yawf ?? {};
 
-  const util = yawf.util;
   const storage = yawf.storage;
-  const config = yawf.config = yawf.config || {};
+  const config = yawf.config = yawf.config ?? {};
   const pools = config.pools = [];
 
-  const i18n = util.i18n;
-
   config.init = async function (uid) {
-    const userPromise = config.pool('Config', { uid });
-    const globalPromise = config.pool('Config');
+    const userPromise = uid != null ? config.pool('Config', { uid, isLocal: true }) : Promise.resolve(null);
+    const globalPromise = config.pool('Config', { isLocal: true });
     const [user, global] = await Promise.all([userPromise, globalPromise]);
     Object.assign(config, { user, global });
   };

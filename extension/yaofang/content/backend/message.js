@@ -1,6 +1,7 @@
 ; (function () {
 
-  const yawf = window.yawf = window.yawf || {};
+  const browser = window.weBrowser;
+  const yawf = window.yawf = window.yawf ?? {};
   const message = yawf.message = {};
 
   message.export = (function () {

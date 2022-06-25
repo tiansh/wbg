@@ -3,6 +3,7 @@
  */
 ; (function () {
 
+  const browser = window.weBrowser;
   const yawf = window.yawf;
   const env = yawf.env;
   const message = yawf.message;
@@ -92,7 +93,7 @@
       /* no menu */
     }
     if (contextMenuIndex !== lastContextMenuIndex) return;
-    if (!items || !items.length) return;
+    if (!items?.length) return;
     const rootMenu = browser.menus.create({
       title: menuTitleWithAccessKey(browser.i18n.getMessage('extensionName'), env.config.contextMenuKey),
       contexts: ['tab'],

@@ -1,7 +1,8 @@
 ; (function () {
 
-  const yawf = window.yawf = window.yawf || {};
-  const util = yawf.util = yawf.util || {};
+  const browser = window.weBrowser;
+  const yawf = window.yawf = window.yawf ?? {};
+  const util = yawf.util = yawf.util ?? {};
 
   const storage = yawf.storage = {};
 
@@ -64,6 +65,7 @@
       this.last = Promise.resolve();
       this.processing = false;
       this.dirty = false;
+      this.initialized = false;
       /** @type Array<Function> */
       this.watcher = [];
       watcher.addListener(this, newValue => {
@@ -128,9 +130,17 @@
       });
     }
     async get() {
-      const results = await this.run(() => (
+      let results = await this.run(() => (
         browser.storage[this.area].get(this.key)
       ));
+      if (!this.initialized && this.area === 'local' && !Object.hasOwnProperty.call(results, this.key)) {
+        results = await this.run(async () => {
+          const data = await browser.storage.sync.get(this.key);
+          await browser.storage.local.set(data);
+          return data;
+        });
+      }
+      this.initialized = true;
       return results[this.key];
     }
     /** @param {*} value */
@@ -169,7 +179,7 @@
     }
     triggerOnChanged(key, newValue, oldValue) {
       const callbacks = this.watcher.get(key);
-      if (!callbacks || !callbacks.size) return;
+      if (!callbacks?.size) return;
       const clonedNewValue = newValue && JSON.parse(JSON.stringify(newValue));
       const clonedOldValue = oldValue && JSON.parse(JSON.stringify(oldValue));
       callbacks.forEach(callback => {
@@ -255,7 +265,7 @@
     key(key) {
       return new ConfigKey(this, key);
     }
-    async import(data) {
+    async importConfig(data) {
       this.value = JSON.parse(JSON.stringify(data));
       await this.storage.set(this.value);
     }
@@ -288,5 +298,18 @@
     return new ConfigCollection(storage);
   };
 
+}());
+
+// 将数据从 sync 移动到 local
+; (async function () {
+  const browser = window.weBrowser;
+  const [syncStorage, localStorage] = await Promise.all([
+    browser.storage.sync.get(),
+    browser.storage.local.get(),
+  ]);
+  const [syncKeys, localKeys] = [syncStorage, localStorage].map(storage => Object.keys(storage || {}));
+  const syncOnlyKeys = syncKeys.filter(key => !localKeys.includes(key));
+  const updateObject = Object.assign({}, ...syncOnlyKeys.map(key => ({ [key]: syncStorage[key] })));
+  await browser.storage.local.set(updateObject);
 }());
 

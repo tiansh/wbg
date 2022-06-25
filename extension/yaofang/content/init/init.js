@@ -19,16 +19,26 @@
 
   const yawf = window.yawf;
   const util = yawf.util;
-  const init = yawf.init = yawf.init || {};
+  const init = yawf.init = yawf.init ?? {};
+  yawf.WEIBO_VERSION = 0;
 
-  const page = init.page = init.page || {};
+  const page = init.page = init.page ?? {};
 
-  const validPageReady = $CONFIG => {
+  const validPageReadyV6 = $CONFIG => {
     // 必须的参数
     if (!$CONFIG) return false;
     if (!$CONFIG.uid) return false;
     if (!$CONFIG.nick) return false;
     if ($CONFIG.islogin === '0') return false;
+    return true;
+  };
+
+  const validPageReadyV7 = config => {
+    // 必须的参数
+    if (!config) return false;
+    if (!config.user) return false;
+    if (!config.user.idstr) return false;
+    if (!config.user.screen_name) return false;
     return true;
   };
 
@@ -59,7 +69,7 @@
     for (const { callback } of list) {
       try {
         const result = callback();
-        if (result && typeof result.then === 'function') {
+        if (typeof result?.then === 'function') {
           await Promise.resolve(result);
         }
       } catch (e) {
@@ -69,12 +79,22 @@
     set.clear();
   };
 
+  const genV6LikeConfigByV7Config = config => ({
+    uid: config.user.idstr,
+    name: config.user.screen_name,
+    oid: null, // 无数据
+    domain: '', // 无数据
+    bpType: '', // 无数据
+    location: '', // 无数据
+    lang: 'zh-CN',
+    skin: null, // 无数据
+  });
+
   init.status = () => status;
   // 触发 Ready
   init.ready = async $CONFIG => {
-    page.$CONFIG = $CONFIG;
     status = true;
-    init.ready = noop;
+    init.ready = init.deinit = noop;
     util.debug('yawf onready');
     await runSet(onReadyCallback);
     if (['complete', 'loaded', 'interactive'].includes(document.readyState)) {
@@ -84,11 +104,28 @@
     }
   };
   // 触发 ConfigChange
-  init.configChange = async $CONFIG => {
-    util.debug('yawf onconfigchange: %o', $CONFIG);
-    await runSet(onConfigChangeCallback);
-    if (validPageReady($CONFIG)) {
-      await init.ready($CONFIG);
+  init.configChange = async config => {
+    util.debug('yawf onconfigchange: %o', config);
+    if (validPageReadyV6(config)) {
+      if (!yawf.WEIBO_VERSION) {
+        yawf.WEIBO_VERSION = 6;
+        document.documentElement.classList.add('yawf-WBV6');
+      }
+      if (yawf.WEIBO_VERSION !== 6) return;
+      page.$CONFIG = config;
+      await runSet(onConfigChangeCallback);
+      await init.ready(config);
+    } else if (validPageReadyV7(config)) {
+      if (!yawf.WEIBO_VERSION) {
+        yawf.WEIBO_VERSION = 7;
+        document.documentElement.classList.add('yawf-WBV7');
+      }
+      if (yawf.WEIBO_VERSION !== 7) return;
+      if (!page.route) return;
+      page.config = config;
+      page.$CONFIG = genV6LikeConfigByV7Config(config);
+      await runSet(onConfigChangeCallback);
+      await init.ready(config);
     } else {
       await init.deinit();
       return;

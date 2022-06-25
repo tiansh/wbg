@@ -1,7 +1,7 @@
 ; (function () {
 
-  const yawf = window.yawf = window.yawf || {};
-  const util = yawf.util = yawf.util || {};
+  const yawf = window.yawf = window.yawf ?? {};
+  const util = yawf.util = yawf.util ?? {};
 
   const i18n = util.i18n;
   const time = util.time = {};
@@ -13,15 +13,16 @@
     timeSecondBefore: { cn: '秒前', tw: '秒前', en: ' secs ago' },
   });
 
-  const timeToParts = (time, locale = true) => (
-    new Date(time - new Date(time).getTimezoneOffset() * 6e4 * locale)
-      .toISOString().match(/\d+/g)
-  );
+  const timeToParts = (time, locale = 'current') => {
+    const offset = locale === 'current' ? new Date(time).getTimezoneOffset() :
+      locale === 'cst' ? -480 : 0;
+    return new Date(time - offset * 6e4).toISOString().match(/\d+/g);
+  };
 
   time.parse = function (text) {
     let parseDate = null;
     const now = Date.now();
-    const [cy, cm, cd] = timeToParts(now);
+    const [cy, cm, cd] = timeToParts(now, 'cst');
     if (/^\d+-\d+-\d+ \d+:\d+$/.test(text)) {
       const [y, m, d, h, u] = text.match(/\d+/g);
       parseDate = Date.UTC(y, m - 1, d, h, u) - 288e5;
@@ -58,10 +59,10 @@
     return new Date(Date.now() - time.diff);
   };
 
-  time.format = function (time, format) {
+  time.format = function (time, { format = 'auto', locale = 'current' } = {}) {
     const ref = now();
-    const [iy, im, id, ih, iu] = timeToParts(time);
-    const [ny, nm, nd, nh, nu] = timeToParts(ref);
+    const [iy, im, id, ih, iu] = timeToParts(time, locale);
+    const [ny, nm, nd, nh, _nu] = timeToParts(ref, locale);
     const diff = (ref - time) / 1e3;
     if (format === 'full') {
       return formatter.format(time);
@@ -81,6 +82,11 @@
   time.diff = 0;
   time.setDiff = function (diff) {
     time.diff = +diff || 0;
+  };
+
+  time.isCstEquivalent = function () {
+    const year = new Date().getFullYear();
+    return [...Array(366)].every((_, i) => new Date(year, 0, i).getTimezoneOffset() === -480);
   };
 
 }());

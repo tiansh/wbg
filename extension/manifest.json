@@ -23,6 +23,7 @@
   "background": {
     "scripts": [
       "common/global/env.js",
+      "yaofang/common/global/stub.js",
       "yaofang/common/browser/browser.js",
       "yaofang/common/util/functools.js",
 
@@ -45,6 +46,7 @@
       ],
       "js": [
         "common/global/env.js",
+        "yaofang/common/global/stub.js",
         "yaofang/common/browser/browser.js",
         "yaofang/common/util/functools.js",
         "yaofang/common/util/urls.js",

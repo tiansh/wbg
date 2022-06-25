@@ -1,9 +1,11 @@
 ; (function () {
 
   const yawf = window.yawf;
+  const init = yawf.init;
+  const page = init.page;
 
-  const feedParser = yawf.feed = {};
-  const commentParser = yawf.comment = {};
+  const feedParser = yawf.feedV6 = {};
+  const commentParser = yawf.commentV6 = {};
 
   // 文本
   // 文本分为完整模式（用于正则匹配）和简易模式（用于关键词）
@@ -88,7 +90,6 @@
     return true;
   };
 
-
   /**
    * 检查某个元素是否是一条转发的微博
    * @param {Element} element
@@ -97,6 +98,28 @@
   const isForwardFeedElement = function (element) {
     if (!isFeedElement(element)) return false;
     if (!element.hasAttribute('omid')) return false;
+    return true;
+  };
+
+  /**
+   * 检查某个元素是否是一条类似简单转发的微博
+   * @param {Element} element
+   * @returns {boolean}
+   */
+  const isFastFeedElement = function (element) {
+    if (!isFeedElement(element)) return false;
+    if (!element.hasAttribute('fmid')) return false;
+    return true;
+  };
+
+  /**
+   * 检查某个元素是否是一条快转的微博
+   * @param {Element} element
+   * @returns {boolean}
+   */
+  const isFastForwardFeedElement = function (element) {
+    if (!isFastFeedElement(element)) return false;
+    if (element.getAttribute('isfastforward') !== '1') return false;
     return true;
   };
 
@@ -115,6 +138,10 @@
       const [source] = feedParser.source.dom(feed, true);
       const [date] = feedParser.date.dom(feed, true);
       post = [author, ...post, source, date];
+    }
+    if (feed.hasAttribute('fmid')) {
+      const [fauthor] = feedParser.fauthor.dom(feed);
+      post.unshift(fauthor);
     }
     if (feed.hasAttribute('omid')) {
       const reason = feedParser.content.dom(feed, false, false);
@@ -269,7 +296,14 @@
         const sibling = [...node.parentNode.children];
         items.push(...sibling.filter(item => item.matches('a[title]')));
       } else {
-        items.push(...node.parentNode.querySelectorAll('[title]'));
+        const icons = [];
+        for (let next = node; next; next = next.nextElementSibling) {
+          if (next.matches('.sp_kz')) break;
+          if (next.matches('[title]')) icons.push(next);
+          const inner = next.querySelector('.W_icon[title]');
+          if (inner) icons.push(inner);
+        }
+        items.push(...icons);
       }
       const icons = items.filter(item => item !== node && item.title.trim());
       return icons.map(icon => `[${icon.title.trim()}]`);
@@ -283,8 +317,10 @@
       if (!node.matches('.WB_detail > .WB_info > .W_fb[usercard]')) return null;
       if (!detail) return '';
       const name = '@' + node.textContent.trim();
+      const id = new URLSearchParams(node.getAttribute('usercard')).get('id');
+      const link = 'https://weibo.com/u/' + id;
       const icons = userIcons(node);
-      return [name, ...icons].join(' ');
+      return [name, link, ...icons].join(' ');
     };
     parsers.push(author);
     /**
@@ -295,8 +331,10 @@
       if (!node.matches('.WB_expand > .WB_info > .W_fb[usercard]')) return null;
       if (!detail) return '';
       const name = node.textContent.trim().replace(/^@?/, '@');
+      const id = new URLSearchParams(node.getAttribute('usercard')).get('id');
+      const link = 'https://weibo.com/u/' + id;
       const icons = userIcons(node);
-      return [name, ...icons].join(' ');
+      return [name, link, ...icons].join(' ');
     };
     parsers.push(original);
     /**
@@ -479,7 +517,7 @@
     const parser = detail ? fullTextParser : simpleTextParser;
     const elements = feedContentElements(target, { detail, long: true });
     if (elements) {
-      const texts = elements.map(element => parser(element) || '');
+      const texts = elements.map(element => parser(element) ?? '');
       return texts.join(detail ? '\u2028' : '\n');
     } else {
       return parser(target);
@@ -520,6 +558,7 @@
   };
 
   // 作者（这条微博是谁发的）
+  // 对于快转微博，是这条微博转发自的作者
   const author = feedParser.author = {};
   author.dom = feed => {
     if (!(feed instanceof Node)) return [];
@@ -537,7 +576,7 @@
       return domList.map(dom => new URLSearchParams(dom.getAttribute('usercard')).get('id'));
     } else {
       return domList.map(dom => {
-        const [_, uid] = dom.pathname.match(/^\/(?:u\/)?(\d+)/) || [];
+        const uid = dom.pathname.match(/^\/(?:u\/)?(\d+)/)?.[1];
         return String(Number.parseInt(uid, 10));
       }).filter(uid => +uid);
     }
@@ -558,6 +597,35 @@
     }
   };
 
+  // 快转作者
+  const fauthor = feedParser.fauthor = {};
+  fauthor.dom = feed => {
+    if (!(feed instanceof Node)) return [];
+    if (!isSearchFeedElement(feed)) {
+      const fauthor = feed.querySelector('.sp_kz ~ a[usercard]');
+      return fauthor ? [fauthor] : [];
+    } else {
+      return [];
+    }
+  };
+  fauthor.id = feed => {
+    const domList = fauthor.dom(feed);
+    if (!isSearchFeedElement(feed)) {
+      return domList.map(dom => new URLSearchParams(dom.getAttribute('usercard')).get('id'));
+    } else {
+      return [];
+    }
+  };
+  fauthor.name = feed => {
+    const domList = fauthor.dom(feed);
+    const $CONFIG = page.$CONFIG;
+    return domList.map(dom => {
+      const id = new URLSearchParams(dom.getAttribute('usercard')).get('id');
+      if (id === $CONFIG.uid) return $CONFIG.nick;
+      return dom.textContent.trim();
+    });
+  };
+
   // 原作者（一条被转发的微博最早来自谁）
   const original = feedParser.original = {};
   original.dom = feed => {
@@ -576,14 +644,14 @@
       return domList.map(dom => new URLSearchParams(dom.getAttribute('usercard')).get('id'));
     } else {
       return domList.map(dom => {
-        const [_, uid] = dom.pathname.match(/^\/(?:u\/)?(\d+)/) || [];
+        const uid = dom.pathname.match(/^\/(?:u\/)?(\d+)/)?.[1];
         return String(Number.parseInt(uid, 10));
       }).filter(uid => +uid);
     }
   };
   original.name = feed => {
     const domList = original.dom(feed);
-    return domList.map(dom => dom.textContent.trim());
+    return domList.map(dom => dom.textContent.trim().replace(/^@/, ''));
   };
 
   // 提到（微博中提到的人，转发路径中的人同属于提到）
@@ -759,15 +827,18 @@
   feedParser.isFeed = feed => isFeedElement(feed);
   feedParser.isSearchFeed = feed => isSearchFeedElement(feed);
   feedParser.isForward = feed => isForwardFeedElement(feed);
+  feedParser.isFast = feed => isFastFeedElement(feed);
+  feedParser.isFastForward = feed => isFastForwardFeedElement(feed);
 
   feedParser.mid = node => feedContainer(node).getAttribute('mid');
   feedParser.omid = node => feedContainer(node).getAttribute('omid');
+  feedParser.fmid = node => feedContainer(node).getAttribute('fmid');
 
   // 评论内容
   commentParser.text = target => {
     const elements = commentContentElements(target);
     if (elements) {
-      const texts = elements.map(element => commentTextParser(element) || '');
+      const texts = elements.map(element => commentTextParser(element) ?? '');
       return texts.join('\n');
     } else {
       return commentTextParser(target);
@@ -786,6 +857,141 @@
       .map(dom => dom.textContent.trim().replace(/^@?/, ''))
       .filter(user => user);
   };
+
+}());
+; (function () {
+
+  const yawf = window.yawf;
+
+  const feedParser = yawf.feedV7 = {};
+  const commentParser = yawf.commentV7 = {}; // eslint-disable-line no-unused-vars
+
+  // 将时间格式化为东八区的 ISO 8601 串
+  const date = function (dateStr) {
+    const date = new Date(dateStr);
+    date.setHours(date.getHours() + 8);
+    if ((date.getUTCFullYear() + '').length !== 4) return '';
+    return [
+      date.getUTCFullYear(),
+      '-', (date.getUTCMonth() + 1 + '').padStart(2, 0),
+      '-', (date.getUTCDate() + '').padStart(2, 0),
+      'T', (date.getUTCHours() + '').padStart(2, 0),
+      ':', (date.getUTCMinutes() + '').padStart(2, 0),
+      ':', (date.getUTCSeconds() + '').padStart(2, 0),
+      '.', (date.getUTCMilliseconds() + '').padStart(3, 0),
+      '+0800',
+    ].join('');
+  };
+
+  const catched = (f, v = null) => feed => { try { return f(feed); } catch (e) { return v; } };
+  const mid = mid => mid > 0 ? mid : null;
+
+  feedParser.mid = feed => mid(feed.mid);
+  feedParser.omid = feed => mid(feed.retweeted_status?.mid);
+
+  feedParser.isFast = feed => feed.screen_name_suffix_new != null;
+  feedParser.isFastForward = feed => feedParser.isFast(feed) && feed.ori_mid != null;
+  feedParser.isForward = feed => feed.retweeted_status != null;
+
+  const author = feedParser.author = {};
+  author.avatar = catched(feed => feed.user.avatar_large || feed.user.avatar_hd, null);
+  author.id = feed => [feed.user.idstr];
+  author.name = feed => [feed.user.screen_name];
+  const fauthor = feedParser.fauthor = {};
+  fauthor.id = feed => feedParser.isFastForward(feed) ? [String(feed.ori_uid)] : []; // ori_mid 是被快转微博 id，ori_uid 是转快转的人的 id
+  fauthor.name = catched(feed => feedParser.isFastForward(feed) ? [feed.screen_name_suffix_new.find(x => x.type === 2).content] : [], []);
+  const original = feedParser.original = {};
+  original.id = catched(feed => feed.retweeted_status ? [feed.retweeted_status.user.idstr] : [], []);
+  original.name = catched(feed => feed.retweeted_status ? [feed.retweeted_status.user.screen_name] : [], []);
+  const linkTopics = feed => {
+    if (!Array.isArray(feed.url_struct)) return [];
+    const topics = [];
+    feed.url_struct.forEach(url => {
+      const match = url.short_url.match(/#([^#]*)\[超话\]#/);
+      if (match && match[0]) topics.push(match[0]);
+    });
+    return topics;
+  };
+  const text = feedParser.text = {};
+  text.detail = feed => {
+    let text = [feed, feed.retweeted_status].filter(x => x?.user).map(x => [
+      x.user.screen_name,
+      x.longTextContent_raw || x.text_raw,
+      x.source,
+      date(x.created_at),
+    ]).reduce((x, y) => x.concat(y)).join('\u2028');
+    if (Array.isArray(feed.url_struct)) {
+      text = feed.url_struct.reduce(url => {
+        if (!url?.short_url || !/https?:\/\//.test(url.short_url)) return text;
+        return text.split(url.short_url).join((url.long_url || url.short_url) + '\ufff9' + (url.url_title ?? '') + '\ufffb');
+      }, text);
+    }
+    const topics = linkTopics(feed).map(t => `#${t}[超话]#`).join('');
+    if (topics) text += '\n' + topics;
+    return text;
+  };
+  text.simple = feed => {
+    let text = [feed, feed.retweeted_status].filter(x => x)
+      .map(x => x.longTextContent_raw || x.text_raw).join('\n');
+    if (Array.isArray(feed.url_struct)) {
+      text = feed.url_struct.reduce(url => {
+        if (!url?.short_url || !/https?:\/\//.test(url.short_url)) return text;
+        return text.split(url.short_url).join(url.url_title || url.long_URL || url.short_url);
+      }, text);
+    }
+    const topics = linkTopics(feed).map(t => `#${t}[超话]#`).join('');
+    if (topics) text += '\n' + topics;
+    return text;
+  };
+  const mention = feedParser.mention = {};
+  mention.name = feed => {
+    const text = [feed, feed.retweeted_status].filter(x => x)
+      .map(x => x.longTextContent_raw || x.text_raw).join('\n');
+    const users = text.match(/@[\u4e00-\u9fa5|\uE7C7-\uE7F3|\w_\-·]+/g) || [];
+    return users.map(u => u.slice(1));
+  };
+  const topic = feedParser.topic = {};
+  topic.text = feed => {
+    const topics = linkTopics(feed);
+    if (Array.isArray(feed.topic_struct)) {
+      topics.push(...feed.topic_struct.map(topic => topic.topic_title));
+    }
+    if (Array.isArray(feed.url_struct)) {
+      // 所有不是 https? 开头的链接
+      topics.push(...feed.url_struct.map(x => x.short_url).filter(x => x && /^([#$]).*\1$/.test(x)));
+    }
+    return [...new Set(topics.map(text => text.replace(/[#\ue627$]|\[超话\]$/g, '').trim()))];
+  };
+  const source = feedParser.source = {};
+  source.text = feed => {
+    const sources = [feed, feed.retweeted_status].filter(x => x).map(x => x.source);
+    return sources;
+  };
+  const pics = feedParser.pics = {};
+  pics.info = feed => {
+    const pics = [];
+    [feed, feed.retweeted_status].forEach(fd => {
+      if (fd?.pic_infos) pics.push(...Object.keys(fd.pic_infos).map(k => fd.pic_infos[k]));
+    });
+    return pics;
+  };
+
+
+}());
+; (function () {
+  const yawf = window.yawf;
+  const init = yawf.init;
+  const util = yawf.util;
+
+  const priority = util.priority;
+
+  const feedParser = yawf.feed = {};
+  const commentParser = yawf.comment = {};
+
+  init.onLoad(function () {
+    Object.setPrototypeOf(feedParser, yawf.WEIBO_VERSION === 6 ? yawf.feedV6 : yawf.feedV7);
+    Object.setPrototypeOf(commentParser, yawf.WEIBO_VERSION === 6 ? yawf.commentV6 : yawf.commentV7);
+  }, { priority: priority.FIRST });
 
 }());
 
