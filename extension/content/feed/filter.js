@@ -147,7 +147,8 @@
       if (!this.isEnabled()) return true;
       const start = this.ref.start.getConfig();
       const end = this.ref.end.getConfig();
-      const date = feedParser.date.date(feed);
+      const date = feedParser.date.date(feed, true)[0];
+      if (!date) return false;
       const dateStr = new Date(+date + 288e5).toISOString().split('T')[0];
       if (dateStr <= end && dateStr >= start) return true;
       if (dateStr >= end && dateStr <= start) return true;
