@@ -159,7 +159,7 @@
 
       this.buffer = [];
       this.consumed = false;
-      this.pageProgress = new Progresser(this.last);
+      this.pageProgress = new Progresser(this.last - this.first + 1);
       this.itemProgress = new Progresser();
       this.log = new Log();
 
@@ -213,7 +213,7 @@
     async fetch(callback) {
       this.pageProgress.setValue(0);
       this.page = this.first;
-      if (this.isDelete) this.peek = 0;
+      this.peek = 0;
       this.processed = 0;
       while (!this.isDone()) {
         if (this.processed) {
@@ -420,8 +420,10 @@
       if (feedlist) {
         params.set('feed_type', feedlist.getAttribute('feed-type') || 0);
       }
+      if (!params.has('pre_page') && params.has('page')) {
+        params.set('pre_page', params.get('page'));
+      }
       if (!params.has('page')) params.set('page', 1);
-      if (!params.has('pre_page')) params.set('pre_page', params.get('page'));
       const lazyloadData = new URLSearchParams(lazyload.getAttribute('action-data') || '');
       lazyloadData.forEach((value, name) => { params.set(name, value); });
       params.set('domain_op', context.config.domain || '');
